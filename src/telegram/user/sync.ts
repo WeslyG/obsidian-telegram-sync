@@ -1,11 +1,9 @@
 import type { Message } from "src/telegram/bot/apiTypes";
-import { Api } from "telegram/tl";
-import { getPeerId } from "telegram/Utils";
+import { Api, utils } from "teleproto";
 import { isAllowedChat } from "../bot/access";
 import { checkUserService, clientUser } from "./client";
 import { getOffsetDate } from "src/utils/dateUtils";
 import TelegramSyncPlugin from "src/main";
-import { Dialog } from "telegram/tl/custom/dialog";
 import { _5sec, cleanErrorCache, displayAndLog, displayAndLogError, _day, errorCache } from "src/utils/logUtils";
 import { Notice } from "obsidian";
 import { extractMediaId } from "../convertors/botFileToMessageMedia";
@@ -62,7 +60,7 @@ export async function getChatsForSearch(plugin: TelegramSyncPlugin, offsetDays: 
 		notice.setMessage("Can't execute searching for chats because can't identify bot username");
 		return [];
 	}
-	let allDialogs: Dialog[] = [];
+	let allDialogs: Awaited<ReturnType<typeof checkedClient.getDialogs<false>>>[number][] = [];
 	try {
 		allDialogs = await checkedClient.getDialogs({ limit: plugin.settings.processOldMessagesSettings.dialogsLimit });
 	} catch {
@@ -71,7 +69,7 @@ export async function getChatsForSearch(plugin: TelegramSyncPlugin, offsetDays: 
 	allDialogs = allDialogs.filter(
 		(dialog) =>
 			(!dialog.isUser || dialog.id?.toJSNumber() == plugin.botUser?.id) &&
-			dialog.date > getOffsetDate(offsetDays),
+			(dialog.date ?? 0) > getOffsetDate(offsetDays),
 	);
 	notification = `${notification}\n\n2 of 3\nFiltering chats by bot "${botUserName}"`;
 	const chatsForSearch: ChatForSearch[] = [];
@@ -122,7 +120,7 @@ export async function getUnprocessedMessages(plugin: TelegramSyncPlugin): Promis
 		try {
 			const peer = correctPeerObject(chat.peer);
 			const privateBot = peer instanceof Api.InputPeerUser && peer.userId.toString() === String(botId);
-			const chatId = privateBot ? checkedUser.id.toJSNumber() : Number(getPeerId(peer));
+			const chatId = privateBot ? checkedUser.id.toJSNumber() : Number(utils.getPeerId(peer));
 			if (!Number.isSafeInteger(chatId) || (peer instanceof Api.InputPeerUser && !privateBot)) continue;
 			if (!isAllowedChat(plugin.settings.allowedChats, chatId, privateBot ? checkedUser.username : undefined))
 				continue;

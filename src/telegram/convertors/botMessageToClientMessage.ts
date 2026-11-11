@@ -1,9 +1,8 @@
 import type { Message, User } from "src/telegram/bot/apiTypes";
-import { Api } from "telegram/tl";
-import { TelegramClient } from "telegram/client/TelegramClient";
+import { Api } from "teleproto/tl";
+import type { TelegramClient } from "teleproto";
 import { getFileObject } from "../bot/message/getters";
 import { extractMediaId } from "./botFileToMessageMedia";
-import { TotalList } from "telegram/Helpers";
 import { _1sec } from "src/utils/logUtils";
 import { unixTime2Date } from "src/utils/dateUtils";
 
@@ -20,7 +19,7 @@ interface MessagesRequests {
 	botChatId: number;
 	msgDate: number;
 	limit: number;
-	messages: TotalList<Api.Message>;
+	messages: Api.Message[];
 }
 
 interface UserCouple {

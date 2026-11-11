@@ -29,7 +29,7 @@ export type PluginStatus = "unloading" | "unloaded" | "loading" | "loaded";
 
 // Main class for the Telegram Sync plugin
 export default class TelegramSyncPlugin extends Plugin {
-	settings: TelegramSyncSettings;
+	declare settings: TelegramSyncSettings;
 	settingsTab?: TelegramSyncSettingTab;
 	private botStatus: ConnectionStatus = "disconnected";
 	// TODO LOW: change to userStatus and display in status bar

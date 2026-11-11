@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { portableTelegram } from "../scripts/bundle-dependencies.mjs";
 
 const require = createRequire(import.meta.url);
 const root = mkdtempSync(join(tmpdir(), "telegram-sync-security-"));
@@ -32,6 +33,7 @@ await build({
 			'export { sanitizeFilePath } from "./src/utils/fsUtils";',
 			'export { displayAndLogError } from "./src/utils/logUtils";',
 			'export { connect } from "./src/telegram/user/user";',
+			'export { Logger, sessions, TelegramClient, WebSocketTransport } from "teleproto";',
 		].join("\n"),
 		resolveDir: process.cwd(),
 		loader: "ts",
@@ -40,10 +42,38 @@ await build({
 	bundle: true,
 	platform: "node",
 	external: ["obsidian"],
-	alias: { websocket: "websocket/lib/browser.js" },
+	plugins: [portableTelegram],
 });
 const api = require(entry);
 const { TFile } = require(join(host, "index.js"));
+
+test("the bundled MTProto client can load an existing WebSocket session without native add-ons", async () => {
+	const address = Buffer.from("pluto.web.telegram.org");
+	const header = Buffer.from([1, 0, address.length]);
+	const port = Buffer.from([1, 187]);
+	const key = Buffer.alloc(256, 42);
+	const saved = "1" + Buffer.concat([header, address, port, key]).toString("base64");
+	const session = new api.sessions.StringSession(saved);
+	await session.load();
+	assert.equal(session.serverAddress, address.toString());
+	assert.equal(session.port, 443);
+	assert.deepEqual(session.authKey.getKey(), key);
+	assert.equal(session.save(), saved);
+
+	const logger = new api.Logger();
+	logger.handler = () => {};
+	const client = new api.TelegramClient(session, 12345, "test", {
+		transport: new api.WebSocketTransport(),
+		baseLogger: logger,
+	});
+	try {
+		assert.equal(client._transport.webSocket, true);
+	} finally {
+		await client.destroy();
+	}
+	assert.throws(() => new api.sessions.StoreSession("unused"), /Disk sessions are disabled/);
+});
+
 const message = {
 	message_id: 17,
 	date: 1700000000,

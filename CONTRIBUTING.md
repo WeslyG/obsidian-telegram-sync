@@ -12,7 +12,7 @@ I'm thrilled you're considering making a contribution to my project! The process
 
 2. **Clone the Repository**: In your new fork, click the "Code" button and copy the URL. Then, open your terminal and run the command `git clone [URL]`.
 
-3. **Create a New Branch** from `main` and install dependencies with `npm ci --ignore-scripts` using Node.js 24. The project disables dependency lifecycle scripts. CI validates registry tarballs and integrity hashes, checks npm advisories, and verifies npm registry signatures.
+3. **Create a New Branch** from `main` and install dependencies with `npm ci --ignore-scripts` using Node.js 26 LTS (see .node-version). The project disables dependency lifecycle scripts. CI validates registry tarballs and integrity hashes, checks npm advisories, and verifies npm registry signatures.
 
 4. **Make Your Changes**: Now's the time to contribute your changes to the project. Once you're finished, add your changes with `git add .`.
 

@@ -1,6 +1,7 @@
 import type { Chat, ChatType, User } from "src/telegram/bot/apiTypes";
-import { Api } from "telegram/tl";
-import { Entity } from "telegram/define";
+import { Api } from "teleproto/tl";
+
+type Entity = Api.TypeUser | Api.TypeChat;
 
 function getChatType(entity: Entity | undefined): ChatType {
 	return entity instanceof Api.User

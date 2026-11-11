@@ -114,6 +114,7 @@ export function createBotProxyAgent(value: string, credentials?: ProxyCredential
 	return url.protocol.startsWith("socks5")
 		? new Socks5Agent(url, credentials)
 		: new HttpsProxyAgent(url, {
+				negotiate: false,
 				headers: () => {
 					if (!credentials) return {};
 					const token = Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64");

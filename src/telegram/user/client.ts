@@ -1,15 +1,11 @@
 import type TelegramBot from "src/telegram/bot/api";
 import type { Message, User } from "src/telegram/bot/apiTypes";
-import { Api } from "telegram/tl";
-import { TelegramClient } from "telegram/client/TelegramClient";
-import { StringSession } from "telegram/sessions/StringSession";
+import { Api, Logger, TelegramClient, WebSocketTransport, sessions } from "teleproto";
 import { releaseVersion } from "release-notes.mjs";
-import QRCode from "qrcode";
+import { Byte, Encoder } from "@nuintun/qrcode";
 import { ProgressBarType, _3MB, createProgressBar, deleteProgressBar, updateProgressBar } from "../bot/progressBar";
 import { clearCachedMessages, getInputPeer, getMessage } from "../convertors/botMessageToClientMessage";
-import { LogLevel, Logger } from "telegram/extensions/Logger";
 import { _5sec } from "src/utils/logUtils";
-import { PromisedWebSockets } from "telegram/extensions";
 
 export type SessionType = "bot" | "user";
 
@@ -36,15 +32,16 @@ export async function stop() {
 export async function init(credentials: TelegramAppCredentials, session: string, signal?: AbortSignal) {
 	await stop();
 	signal?.throwIfAborted();
-	const sessionStore = new StringSession(session);
+	const sessionStore = new sessions.StringSession(session);
+	const logger = new Logger();
+	logger.handler = () => {};
 	const active = new TelegramClient(sessionStore, credentials.apiId, credentials.apiHash, {
 		connectionRetries: 2,
 		deviceModel: "Obsidian Desktop",
 		systemVersion: "Desktop",
 		appVersion: releaseVersion,
-		useWSS: true,
-		networkSocket: PromisedWebSockets,
-		baseLogger: new Logger(LogLevel.NONE),
+		transport: new WebSocketTransport(),
+		baseLogger: logger,
 	});
 	client = active;
 	try {
@@ -68,12 +65,13 @@ export async function signInAsUserWithQrCode(
 	await active.signInUserWithQrCode(credentials, {
 		qrCode: async ({ token }) => {
 			signal.throwIfAborted();
-			const code = await QRCode.toString("tg://login?token=" + token.toString("base64"), { type: "svg" });
-			signal.throwIfAborted();
-			const svg = new DOMParser().parseFromString(code, "image/svg+xml").documentElement;
-			svg.setAttribute("width", "150");
-			svg.setAttribute("height", "150");
-			container.replaceChildren(svg);
+			const code = new Encoder().encode(new Byte("tg://login?token=" + token.toString("base64url")));
+			const image = container.ownerDocument.createElement("img");
+			image.src = code.toDataURL();
+			image.alt = "Telegram login QR code";
+			image.width = 150;
+			image.height = 150;
+			container.replaceChildren(image);
 		},
 		password: async () => {
 			signal.throwIfAborted();

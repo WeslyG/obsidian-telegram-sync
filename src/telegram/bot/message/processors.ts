@@ -24,7 +24,7 @@ import { enqueue } from "src/utils/queues";
 import { sanitizeFileName, sanitizeFilePath } from "src/utils/fsUtils";
 import path from "path";
 import { defaultFileNameTemplate, defaultNoteNameTemplate } from "src/settings/messageDistribution";
-import { Api } from "telegram/tl";
+import { Api } from "teleproto/tl";
 import { setReaction } from "../bot";
 import { emoticonProcessed, emoticonProcessedEdited } from "src/telegram/user/config";
 

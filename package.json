@@ -17,7 +17,7 @@
 		"build": "npm run check && node esbuild.config.mjs production && node scripts/check-bundle.mjs"
 	},
 	"engines": {
-		"node": "24.x"
+		"node": "26.x"
 	},
 	"keywords": [
 		"Telegram",
@@ -32,8 +32,7 @@
 	"license": "GNU Affero General Public License v3.0",
 	"devDependencies": {
 		"@types/mime-types": "^3.0.1",
-		"@types/node": "^24.19.2",
-		"@types/qrcode": "^1.5.6",
+		"@types/node": "^26.6.6",
 		"esbuild": "^0.28.2",
 		"obsidian": "^1.14.4",
 		"oxlint": "^1.93.0",
@@ -41,14 +40,14 @@
 		"typescript": "^7.0.2"
 	},
 	"dependencies": {
-		"agent-base": "^7.1.4",
+		"@nuintun/qrcode": "^5.1.0",
+		"agent-base": "^9.0.0",
 		"big-integer": "^1.6.52",
 		"compare-versions": "^6.1.1",
-		"https-proxy-agent": "^7.0.6",
+		"https-proxy-agent": "^9.1.0",
 		"linkify-it": "^6.1.0",
 		"mime-types": "^3.0.2",
-		"qrcode": "^1.5.4",
 		"socks": "^2.8.10",
-		"telegram": "2.26.22"
+		"teleproto": "1.233.0"
 	}
 }

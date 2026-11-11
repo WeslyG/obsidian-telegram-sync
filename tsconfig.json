@@ -3,7 +3,7 @@
 		"noEmit": true,
 		"module": "preserve",
 		"moduleResolution": "bundler",
-		"target": "ES2018",
+		"target": "ES2022",
 		"allowJs": true,
 		"strict": false,
 		"noImplicitAny": true,
