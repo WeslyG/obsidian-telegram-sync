@@ -18,11 +18,11 @@ I'm thrilled you're considering making a contribution to my project! The process
 
 2. **Clone the Repository**: In your new fork, click the "Code" button and copy the URL. Then, open your terminal and run the command `git clone [URL]`.
 
-3. **Create a New Branch**: Navigate to the project directory by running `cd [project-name]` in your terminal. Switch to the `develop` branch with `git checkout develop` and create a new branch by running `git checkout -b [branch-name]`.
+3. **Create a New Branch** from `main` and install dependencies with `npm ci` using Node.js 24.
 
 4. **Make Your Changes**: Now's the time to contribute your changes to the project. Once you're finished, add your changes with `git add .`.
 
-5. **Do Not Update the Plugin Version**: Please refrain from manually updating the plugin's version. I utilize GitHub Actions to automatically update the version in the following files: manifest.json, package.json, versions.json, package-lock.json, and CHANGELOG.md.
+5. **Run the checks** with `npm run check`. Use `npm run build` to also generate the Obsidian bundle. To try a development build in a test vault, run `npm run test:install -- <vault-path>`.
 
 6. **Commit Your Changes**: Commit your changes with `git commit -m "[commit-message]"`.
 
@@ -42,8 +42,14 @@ I'm thrilled you're considering making a contribution to my project! The process
 
 8. **Push Your Changes**: Push your changes to your fork on GitHub by running `git push origin [branch-name]`.
 
-9. **Create a Pull Request**: Go back to your fork on GitHub, select your branch, and click "New pull request". Make sure the target branch for the pull request is `develop` in the original repository.
+9. **Create a Pull Request** targeting `main`. The **Check and build** job runs the same checks as the local build and uploads the plugin files as a `telegram-sync` artifact.
 
 **🤝 Important Note**: Please make sure to adhere to the coding and commit standards. Commits that do not comply may be rejected.
 
 Thank you for being part of this journey! Your contributions are what keep the project thriving and evolving. 🚀✨
+
+## Publishing a release
+
+1. Run `npm version minor --no-git-tag-version` (or `patch` or `major` as appropriate). Commit the resulting changes to `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` when the minimum Obsidian version changes.
+2. Once the release commit is on `main`, tag that commit with the exact manifest version, for example `git tag 4.1.0 <commit>`. Push it with `git push origin 4.1.0`.
+3. The Release workflow verifies the tag and version files, runs CI, and publishes `main.js`, `manifest.json`, and `styles.css` with GitHub-generated release notes.

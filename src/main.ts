@@ -54,13 +54,13 @@ export default class TelegramSyncPlugin extends Plugin {
 	createdFilePaths: string[] = [];
 	currentDeviceId = machineIdSync(true);
 	lastPollingErrors: string[] = [];
-	restartingIntervalId?: NodeJS.Timer;
+	restartingIntervalId?: ReturnType<typeof setInterval>;
 	restartingIntervalTime = _15sec;
 	messagesLeftCnt = 0;
 	connectionStatusIndicator? = new ConnectionStatusIndicator(this);
 	status: PluginStatus = "loading";
 	time4processOldMessages = false;
-	processOldMessagesIntervalId?: NodeJS.Timer;
+	processOldMessagesIntervalId?: ReturnType<typeof setInterval>;
 	pinCode?: string = undefined;
 
 	async initTelegram(initType?: Client.SessionType) {
@@ -258,7 +258,7 @@ export default class TelegramSyncPlugin extends Plugin {
 			needToSaveSettings = true;
 		}
 
-		needToSaveSettings && (await this.saveSettings());
+		if (needToSaveSettings) await this.saveSettings();
 	}
 
 	async getBotUser(): Promise<TelegramBot.User> {
@@ -301,7 +301,7 @@ export default class TelegramSyncPlugin extends Plugin {
 	botTokenEncrypt(saveSettings = false) {
 		this.settings.botToken = encrypt(this.settings.botToken, this.pinCode);
 		this.settings.botTokenEncrypted = true;
-		saveSettings && this.saveSettings();
+		if (saveSettings) this.saveSettings();
 		displayAndLog(this, "Bot token encrypted", 0);
 	}
 }

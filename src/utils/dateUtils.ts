@@ -1,4 +1,7 @@
-import { moment } from "obsidian";
+import type momentFactory from "moment";
+import { moment as obsidianMoment } from "obsidian";
+
+const moment = obsidianMoment as unknown as typeof momentFactory;
 
 export function formatDateTime(date: Date, format: string): string {
 	return moment(date).format(format);

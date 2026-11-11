@@ -33,9 +33,9 @@ export async function finalizeMessageProcessing(plugin: TelegramSyncPlugin, msg:
 	if (error || !plugin.bot) {
 		return;
 	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	// oxlint-disable-next-line typescript/no-explicit-any
 	const originalMsg: Api.Message | undefined = (msg as any).originalUserMsg;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	// oxlint-disable-next-line typescript/no-explicit-any
 	const mediaMessages: TelegramBot.Message[] = (msg as any).mediaMessages || [];
 
 	if (originalMsg) {

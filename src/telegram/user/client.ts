@@ -55,7 +55,7 @@ export async function init(sessionId: number, sessionType: SessionType, deviceId
 	if (!client || _sessionType !== sessionType || _sessionId !== sessionId) {
 		await stop();
 		const logger = new Logger(LogLevel.ERROR);
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		// oxlint-disable-next-line no-unused-vars
 		logger.log = (level, message, color) => {
 			console.log(`Telegram Sync => User connection error: ${message}`);
 			// TODO in 2024: add user connection status checking and setting by controlling error and info logs
@@ -158,7 +158,7 @@ export async function signInAsUserWithQrCode(container: HTMLDivElement, password
 					}
 					container.appendChild(svg);
 				},
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				// oxlint-disable-next-line no-unused-vars
 				password: async (hint) => {
 					return password ? password : "";
 				},

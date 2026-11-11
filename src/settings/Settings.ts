@@ -105,7 +105,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 	plugin: TelegramSyncPlugin;
 	subscribedOnInsiderChannel: boolean;
 	refreshValues: RefreshValues;
-	refreshIntervalId: NodeJS.Timer;
+	refreshIntervalId?: ReturnType<typeof setInterval>;
 
 	constructor(app: App, plugin: TelegramSyncPlugin) {
 		super(app, plugin);

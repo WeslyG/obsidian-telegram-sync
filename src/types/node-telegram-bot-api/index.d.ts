@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare module "node-telegram-bot-api" {
 	import { ServerOptions } from "https";
-	import { Options } from "request";
+	import { CoreOptions } from "request";
 	import { Readable, Stream } from "stream";
 	namespace TelegramBot {
 		type ReactionType = ReactionTypeEmoji | ReactionTypeCustomEmoji;
@@ -140,7 +140,7 @@ declare module "node-telegram-bot-api" {
 			polling?: boolean | PollingOptions | undefined;
 			webHook?: boolean | WebHookOptions | undefined;
 			onlyFirstMatch?: boolean | undefined;
-			request?: Options | undefined;
+			request?: CoreOptions | undefined;
 			baseApiUrl?: string | undefined;
 			filepath?: boolean | undefined;
 			testEnvironment?: boolean | undefined;

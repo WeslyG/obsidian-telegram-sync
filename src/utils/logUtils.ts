@@ -81,10 +81,10 @@ export function cleanErrorCache() {
 
 // changing GramJs version can cause cache issues and wrong alerts, so it's cure for it
 export function hideMTProtoAlerts(plugin: TelegramSyncPlugin) {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	// oxlint-disable-next-line typescript/no-explicit-any
 	const originalAlert = window.alert as any;
 	if (!originalAlert.__isOverridden) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// oxlint-disable-next-line typescript/no-explicit-any
 		window.alert = function (message?: any) {
 			if (message.includes("Missing MTProto Entity")) {
 				localStorage.removeItem("GramJs:apiCache");

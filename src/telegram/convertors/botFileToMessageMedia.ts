@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import bigInt from "big-integer";
 import { Api } from "telegram";
 import { Buffer } from "buffer";

@@ -116,7 +116,7 @@ export class BotSettingsModal extends Modal {
 			})
 			.onClickEvent((evt) => {
 				evt.preventDefault();
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// oxlint-disable-next-line typescript/no-explicit-any
 				let inputDeviceId: any;
 				try {
 					inputDeviceId = deviceIdSetting.controlEl.firstElementChild;

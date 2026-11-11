@@ -18,7 +18,6 @@ export async function enqueue<C, A extends unknown[], R>(
 	fnOrArgs: AsyncInstanceFunction<C, A, R> | A,
 	...rest: A
 ): Promise<R> {
-	let error: Error | undefined;
 	let context: C | undefined;
 	let fn: AsyncStaticFunction<A, R> | AsyncInstanceFunction<C, A, R>;
 
@@ -39,18 +38,18 @@ export async function enqueue<C, A extends unknown[], R>(
 	if (!queueKey) throw new Error("Function should have a name");
 
 	const queue = (queues.get(queueKey) || Promise.resolve())
+		.catch(() => undefined)
 		.then(async () =>
 			context ? await fn.call(context, ...args) : await (fn as AsyncStaticFunction<A, R>)(...args),
-		)
-		.catch((e) => {
-			error = e;
-		});
+		);
 
 	queues.set(queueKey, queue);
 
-	const result = await queue;
-	if (error) throw error;
-	return result;
+	try {
+		return await queue;
+	} finally {
+		if (queues.get(queueKey) === queue) queues.delete(queueKey);
+	}
 }
 
 export async function enqueueByCondition<A extends unknown[], R>(

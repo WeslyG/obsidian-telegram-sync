@@ -47,7 +47,7 @@ export function clearCachedMessagesInterval() {
 	clearInterval(cachedMessagesIntervalId);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 function getMediaId(media: any): bigint | undefined {
 	if (!media) return undefined;
 	if (media.document && media.document.id) return media.document.id;

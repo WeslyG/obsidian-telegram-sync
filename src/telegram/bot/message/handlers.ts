@@ -1,7 +1,12 @@
-/* eslint-disable no-mixed-spaces-and-tabs */
 import TelegramSyncPlugin from "../../../main";
 import TelegramBot from "node-telegram-bot-api";
-import { appendContentToNote, createFolderIfNotExist, defaultDelimiter, getUniqueFilePath } from "src/utils/fsUtils";
+import {
+	appendContentToNote,
+	createFolderIfNotExist,
+	defaultDelimiter,
+	getUniqueFilePath,
+	toArrayBuffer,
+} from "src/utils/fsUtils";
 import * as release from "../../../../release-notes.mjs";
 import { donationInlineKeyboard } from "./donation";
 import { SendMessageOptions } from "node-telegram-bot-api";
@@ -35,7 +40,7 @@ interface MediaGroup {
 
 const mediaGroups: MediaGroup[] = [];
 
-let handleMediaGroupIntervalId: NodeJS.Timer | undefined;
+let handleMediaGroupIntervalId: ReturnType<typeof setInterval> | undefined;
 
 export function clearHandleMediaGroupInterval() {
 	clearInterval(handleMediaGroupIntervalId);
@@ -55,7 +60,7 @@ export async function handleMessage(plugin: TelegramSyncPlugin, msg: TelegramBot
 	const { fileObject, fileType } = getFileObject(msg);
 	// skip system messages
 
-	!isChannelPost && (await enqueue(ifNewReleaseThenShowChanges, plugin, msg));
+	if (!isChannelPost) await enqueue(ifNewReleaseThenShowChanges, plugin, msg);
 
 	if (!msg.text && !fileObject) {
 		displayAndLog(plugin, `System message skipped`, 0);
@@ -83,7 +88,7 @@ export async function handleMessage(plugin: TelegramSyncPlugin, msg: TelegramBot
 
 	let msgText = (msg.text || msg.caption || fileInfo).replace("\n", "..");
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	// oxlint-disable-next-line typescript/no-explicit-any
 	if ((msg as any).userMsg) {
 		displayAndLog(plugin, `Message skipped: already processed before!\n--- Message ---\n${msgText}\n<===`, 0);
 		return;
@@ -300,7 +305,7 @@ export async function handleFiles(
 			unixTime2Date(msg.date, msg.message_id),
 			fileExtension,
 		);
-		await plugin.app.vault.createBinary(filePath, fileByteArray);
+		await plugin.app.vault.createBinary(filePath, toArrayBuffer(fileByteArray));
 	} catch (e) {
 		if (error) (error as Error).message = (error as Error).message + " | " + e;
 		else error = e;
@@ -321,7 +326,7 @@ async function handleMediaGroup(plugin: TelegramSyncPlugin, distributionRule: Me
 	if (mediaGroups.length > 0 && plugin.messagesLeftCnt == 0) {
 		for (const mg of mediaGroups) {
 			try {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// oxlint-disable-next-line typescript/no-explicit-any
 				(mg.initialMsg as any).mediaMessages = mg.mediaMessages;
 				const noteContent = await createNoteContent(
 					plugin,

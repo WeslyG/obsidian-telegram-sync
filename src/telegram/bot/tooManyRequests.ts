@@ -10,7 +10,7 @@ export function clearTooManyRequestsInterval() {
 	clearInterval(tooManyRequestsIntervalId);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 export function checkIfTooManyRequests(error: any): boolean {
 	try {
 		const errorCode = error.response.body.error_code;

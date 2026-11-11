@@ -11,20 +11,10 @@ export interface ProxyCredentials {
 	password: string;
 }
 
-interface ProxySecretStorage {
-	getSecret(id: string): string | null;
-	setSecret(id: string, secret: string): void;
-}
-
 const proxySecretId = "telegram-sync-bot-proxy-credentials";
 
-function secretStorage(app: App) {
-	// SecretStorage was added in Obsidian 1.11.4, after this project's pinned API typings.
-	return (app as App & { secretStorage?: ProxySecretStorage }).secretStorage;
-}
-
 export function readProxyCredentials(app: App): ProxyCredentials | undefined {
-	const stored = secretStorage(app)?.getSecret(proxySecretId);
+	const stored = app.secretStorage?.getSecret(proxySecretId);
 	if (!stored) return;
 	try {
 		const credentials = JSON.parse(stored);
@@ -35,7 +25,7 @@ export function readProxyCredentials(app: App): ProxyCredentials | undefined {
 }
 
 export function saveProxyCredentials(app: App, credentials?: ProxyCredentials) {
-	const storage = secretStorage(app);
+	const storage = app.secretStorage;
 	if (!storage) throw new Error("Proxy authentication requires Obsidian 1.11.4 or later.");
 	storage.setSecret(proxySecretId, credentials ? JSON.stringify(credentials) : "");
 }

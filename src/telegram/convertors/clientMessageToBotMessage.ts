@@ -73,7 +73,7 @@ export function convertClientMsgToBotMsg(clientMsg: Api.Message): Message {
 	const botChatType: TelegramBot.ChatType = getChatType(clientMsg.chat);
 	const botChat: TelegramBot.Chat = { id: clientMsg.chatId?.toJSNumber() || 0, type: botChatType };
 	const botMsg: Message = { chat: botChat, date: clientMsg.date, message_id: clientMsg.id };
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	// oxlint-disable-next-line typescript/no-explicit-any
 	(botMsg as any).clientId = clientMsg.id;
 
 	// Map similar fields

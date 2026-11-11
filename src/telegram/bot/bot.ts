@@ -65,7 +65,7 @@ export async function connect(plugin: TelegramSyncPlugin) {
 // Stop the bot polling
 export async function disconnect(plugin: TelegramSyncPlugin) {
 	try {
-		plugin.bot && (await plugin.bot.stopPolling());
+		if (plugin.bot) await plugin.bot.stopPolling();
 	} finally {
 		plugin.bot = undefined;
 		plugin.botUser = undefined;
@@ -73,7 +73,7 @@ export async function disconnect(plugin: TelegramSyncPlugin) {
 	}
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 async function handlePollingError(plugin: TelegramSyncPlugin, error: any) {
 	let pollingError = "unknown";
 

@@ -244,7 +244,7 @@ export function addOriginalUserMsg(botMsg: TelegramBot.Message) {
 	const userMsg = findUserMsg(originalMessages, botMsg, mediaId);
 
 	if (userMsg) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// oxlint-disable-next-line typescript/no-explicit-any
 		(botMsg as any).userMsg = userMsg;
 		return;
 	}
@@ -269,7 +269,7 @@ export function addOriginalUserMsg(botMsg: TelegramBot.Message) {
 		botMsg.forward_from_message_id = originalMsg.fwdFrom?.channelPost;
 		botMsg.forward_sender_name = originalMsg.fwdFrom?.fromName;
 		botMsg.forward_signature = originalMsg.fwdFrom?.postAuthor;
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// oxlint-disable-next-line typescript/no-explicit-any
 		(botMsg as any).originalUserMsg = originalMsg;
 	} finally {
 		cachedUnprocessedMessages.remove(unprocessedMessage);

@@ -1,58 +1,49 @@
-name: Release Obsidian plugin
+name: Release
 
 on:
-    pull_request_target:
-        types:
-            - closed
-        branches:
-            - main
+    push:
+        tags: ["[0-9]*.[0-9]*.[0-9]*"]
 
 permissions:
-    contents: write
-    pull-requests: write
+    contents: read
+
+concurrency:
+    group: release-${{ github.ref }}
 
 jobs:
-    release:
-        if: ${{ github.event.pull_request.merged == true && github.head_ref == 'develop' && github.event.pull_request.author_association == 'OWNER' }}
+    build:
+        uses: ./.github/workflows/ci.yml
+
+    publish:
+        name: Publish Obsidian plugin
+        needs: build
         runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: write
         steps:
-            - name: Print github
-              run: echo '${{ toJson(github) }}'
-
-            - name: Checkout repository
-              uses: actions/checkout@v3
-
-            - name: Set up Node.js
-              uses: actions/setup-node@v3
+            - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
               with:
-                  node-version: "18.x"
-
-            - name: Build plugin main.js
-              id: build_plugin
-              run: |
-                  git config core.autocrlf false
-                  git config core.eol lf
-                  npm ci
-                  npm run build
-
-                  TAG_NAME=$(node -p "require('./package.json').version")
-                  echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-
-            - name: Create release
-              uses: softprops/action-gh-release@v1
-              with:
-                  files: |
-                      main.js
-                      manifest.json
-                      styles.css
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  tag_name: ${{ env.TAG_NAME }}
-                  prerelease: false
-                  draft: false
-
-            - name: Create and merge pull request from main to develop
-              run: |
-                  gh pr create -B develop -H main --title 'Merge main into develop' --body 'Merge main into develop'
-                  gh pr merge main --merge --auto --body 'Merge main into develop'
+                  name: telegram-sync
+            - name: Create GitHub release
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  status=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+                    --json isDraft,assets --jq '
+                      if .isDraft then "draft"
+                      elif ([.assets[].name | select(. == "main.js" or . == "manifest.json" or . == "styles.css")] | unique | length) == 3 then "published"
+                      else "incomplete"
+                      end' 2>/dev/null) || status=missing
+                  case "$status" in
+                    draft)
+                      gh release upload "$GITHUB_REF_NAME" main.js manifest.json styles.css --repo "$GITHUB_REPOSITORY" --clobber
+                      gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+                      ;;
+                    published) echo "Release already published with all plugin files." ;;
+                    incomplete) echo "Published release is missing plugin files." >&2; exit 1 ;;
+                    *)
+                      gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css \
+                        --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+                      ;;
+                  esac

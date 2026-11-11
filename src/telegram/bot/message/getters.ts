@@ -1,5 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
-import LinkifyIt from "linkify-it";
+import { linkifyit } from "linkify-it";
 import TelegramSyncPlugin from "src/main";
 import { Topic } from "src/settings/Settings";
 
@@ -113,7 +113,7 @@ export function getUrl(msg: TelegramBot.Message, num = 1, lookInCaptions = true)
 	const text = (msg.text || "") + (lookInCaptions && msg.caption ? msg.caption : "");
 	if (!text) return "";
 
-	const linkify = LinkifyIt();
+	const linkify = linkifyit();
 	const matches = linkify.match(text);
 	return matches ? matches[num - 1].url : "";
 }
@@ -187,12 +187,12 @@ export function getReplyMessageId(msg: TelegramBot.Message): string {
 	return "";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 export function getFileObject(msg: TelegramBot.Message): { fileType: string; fileObject?: any } {
 	for (const fileType of fileTypes) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// oxlint-disable-next-line typescript/no-explicit-any
 		if ((msg as any)[fileType]) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// oxlint-disable-next-line typescript/no-explicit-any
 			return { fileType: fileType, fileObject: (msg as any)[fileType] };
 		}
 	}

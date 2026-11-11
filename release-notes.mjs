@@ -7,11 +7,12 @@
 // TODO NEXT: check reconnecting
 // TODO NEXT: bur in reconnecting on MacBook https://t.me/sm1rnov_id
 import { compareVersions } from "compare-versions";
-export const releaseVersion = "4.0.0";
+import manifest from "./manifest.json" with { type: "json" };
+export const releaseVersion = manifest.version;
 export const showNewFeatures = true;
-export let showBreakingChanges = true;
+export let showBreakingChanges = releaseVersion === "4.0.0";
 
-const newFeatures = `In this release, security has been enhanced by encrypting the bot token`;
+const newFeatures = `See the <a href='https://github.com/WeslyG/obsidian-telegram-sync/releases/tag/${releaseVersion}'>release notes</a> for changes in this version.`;
 export const breakingChanges = `⚠️ <b><i>Breaking changes!\n\nBot token may need to be re-entered.</i></b> ⚠️`;
 export const telegramChannelLink = "https://t.me/obsidian_telegram_sync";
 export const insiderFeaturesLink =
@@ -41,15 +42,4 @@ export function showBreakingChangesInReleaseNotes() {
 export function versionALessThanVersionB(versionA, versionB) {
 	if (!versionA || !versionB) return undefined;
 	return compareVersions(versionA, versionB) == -1;
-}
-
-const check = process.argv[2] === "check";
-
-if (check) {
-	const packageVersion = process.env.npm_package_version;
-
-	if (packageVersion !== releaseVersion) {
-		console.error(`Failed! Release notes are outdated! ${packageVersion} !== ${releaseVersion}`);
-		process.exit(1);
-	}
 }
