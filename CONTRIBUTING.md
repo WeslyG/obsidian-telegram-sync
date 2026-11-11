@@ -42,8 +42,17 @@ I'm thrilled you're considering making a contribution to my project! The process
 
 Thank you for being part of this journey! Your contributions are what keep the project thriving and evolving. 🚀✨
 
+## Developing in a Dev Container
+
+With Docker running and the Dev Containers extension installed, open this repository in VS Code and run **Dev Containers: Reopen in Container** from the Command Palette. The container uses the Node.js version pinned in `.node-version` and installs the locked dependencies on first start. Its Linux `node_modules` lives in a Docker volume separate from any host installation.
+
+- Run `npm run dev` to rebuild the plugin as you edit.
+- Run `npm run check` for type checking, linting and tests, or `npm run build` for the production bundle.
+- After pulling changes to `package-lock.json`, run `npm ci --ignore-scripts` in the container.
+- For a manual test in desktop Obsidian, copy `main.js`, `manifest.json` and `styles.css` from the checkout to a test vault on the host.
+
 ## Publishing a release
 
-1. Run `npm version minor --no-git-tag-version` (or `patch` or `major` as appropriate), then `npm run version:sync`. Commit the changes to `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` when the minimum Obsidian version changes.
+1. Run `npm version minor --no-git-tag-version` (or `patch` or `major` as appropriate), then `npm run version:sync`. Add a section such as `## 5.2.0 (YYYY-MM-DD)` to [CHANGELOG.md](./CHANGELOG.md). Commit the changelog and the version files.
 2. When the release commit is at the tip of `main`, tag it with the exact manifest version, for example `git tag 4.1.0 <commit>`. Push it with `git push origin 4.1.0`.
-3. In [Actions → Release](https://github.com/WeslyG/obsidian-telegram-sync/actions/workflows/release.yml), select **Run workflow**, choose `main`, and enter the tag without a `v` prefix. The workflow verifies that the tag points to the `main` commit selected for the run, then builds and publishes `main.js`, `manifest.json`, and `styles.css`.
+3. In [Actions → Release](https://github.com/WeslyG/obsidian-telegram-sync/actions/workflows/release.yml), select **Run workflow**, choose `main`, and enter the tag without a `v` prefix. The workflow verifies that the tag points to the `main` commit selected for the run, then builds and publishes `main.js`, `manifest.json`, and `styles.css`. The release description contains only the changelog section for that version.

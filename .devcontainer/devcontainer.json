@@ -1,0 +1,12 @@
+{
+	"name": "Telegram Sync",
+	"build": { "dockerfile": "Dockerfile" },
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/obsidian-telegram-sync,type=bind",
+	"workspaceFolder": "/workspaces/obsidian-telegram-sync",
+	"remoteUser": "node",
+	"mounts": [
+		"source=telegram-sync-node-modules-${devcontainerId},target=${containerWorkspaceFolder}/node_modules,type=volume"
+	],
+	"postCreateCommand": "(test -w node_modules || sudo -n /usr/bin/chown node:node /workspaces/obsidian-telegram-sync/node_modules) && node scripts/check-lockfile.mjs && npm ci --ignore-scripts",
+	"waitFor": "postCreateCommand"
+}
