@@ -1,3 +1,4 @@
+import { t } from "src/settings/i18n";
 import type TelegramBot from "src/telegram/bot/api";
 import type { Message, User } from "src/telegram/bot/apiTypes";
 import { Api, Logger, TelegramClient, WebSocketTransport, sessions } from "teleproto";
@@ -68,7 +69,7 @@ export async function signInAsUserWithQrCode(
 			const code = new Encoder().encode(new Byte("tg://login?token=" + token.toString("base64url")));
 			const image = container.ownerDocument.createElement("img");
 			image.src = code.toDataURL();
-			image.alt = "Telegram login QR code";
+			image.alt = t("Telegram login QR code");
 			image.width = 150;
 			image.height = 150;
 			container.replaceChildren(image);

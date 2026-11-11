@@ -1,3 +1,4 @@
+import { t } from "src/settings/i18n";
 import type { Message } from "src/telegram/bot/apiTypes";
 import TelegramSyncPlugin from "src/main";
 import { App, ButtonComponent, PluginSettingTab, Setting, TextComponent } from "obsidian";
@@ -126,19 +127,19 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 
 		await this.addBot();
 		const proxySettings = new Setting(this.containerEl)
-			.setName("Bot proxy")
-			.setDesc("Connect the Telegram bot through an HTTP, HTTPS, or SOCKS5 proxy. ")
+			.setName(t("Bot proxy"))
+			.setDesc(t("Connect the Telegram bot through an HTTP, HTTPS, or SOCKS5 proxy. "))
 			.addButton((button) =>
-				button.setButtonText("Configure").onClick(() => new BotProxySettingsModal(this.plugin).open()),
+				button.setButtonText(t("Configure")).onClick(() => new BotProxySettingsModal(this.plugin).open()),
 			);
-		proxySettings.descEl.createEl("a", { href: proxyGuideLink, text: "Setup guide" });
+		proxySettings.descEl.createEl("a", { href: proxyGuideLink, text: t("Setup guide") });
 		await this.addUser();
 		this.addAdvancedSettings();
 
-		new Setting(this.containerEl).setName("Message distribution rules").setHeading();
+		new Setting(this.containerEl).setName(t("Message distribution rules")).setHeading();
 		await this.addMessageDistributionRules();
 
-		new Setting(this.containerEl).setName("Telegram user features").setHeading();
+		new Setting(this.containerEl).setName(t("Telegram user features")).setHeading();
 		await this.addProcessOldMessages();
 		await this.setRefreshInterval();
 	}
@@ -157,14 +158,14 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		});
 
 		const privacyPolicyButton = versionContainer.createSpan().createEl("a", {
-			text: "Privacy Policy",
+			text: t("Privacy Policy"),
 			href: privacyPolicyLink,
 		});
 		privacyPolicyButton.style.fontSize = "0.75em";
 		privacyPolicyButton.style.color = "LightCoral";
 		privacyPolicyButton.style.textDecoration = "None";
 
-		this.containerEl.createEl("div", { text: "Fork maintained by " }).createEl("a", {
+		this.containerEl.createEl("div", { text: t("Fork maintained by ") }).createEl("a", {
 			text: "WeslyG",
 			href: repositoryUrl,
 		});
@@ -175,22 +176,22 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 
 	async addBot() {
 		const botSettings = new Setting(this.containerEl)
-			.setName("Bot (required)")
-			.setDesc("Connect your telegram bot. It's required for all features.")
+			.setName(t("Bot (required)"))
+			.setDesc(t("Connect your telegram bot. It's required for all features."))
 			.addText(async (botStatus: TextComponent) => {
 				botStatus.setDisabled(true);
 				if (this.plugin.checkingBotConnection) {
-					botStatus.setValue("⏳ connecting...");
+					botStatus.setValue(t("⏳ connecting..."));
 				} else if (this.plugin.isBotConnected()) {
-					botStatus.setValue(`🤖 ${this.plugin.botUser?.username || "connected"}`);
+					botStatus.setValue(`🤖 ${this.plugin.botUser?.username || t("connected")}`);
 				} else {
-					botStatus.setValue("❌ disconnected");
+					botStatus.setValue(t("❌ disconnected"));
 				}
 			})
 			.addButton(async (botSettingsButton: ButtonComponent) => {
-				if (this.plugin.checkingBotConnection) botSettingsButton.setButtonText("Restart");
-				else if (this.plugin.isBotConnected()) botSettingsButton.setButtonText("Settings");
-				else botSettingsButton.setButtonText("Connect");
+				if (this.plugin.checkingBotConnection) botSettingsButton.setButtonText(t("Restart"));
+				else if (this.plugin.isBotConnected()) botSettingsButton.setButtonText(t("Settings"));
+				else botSettingsButton.setButtonText(t("Connect"));
 				botSettingsButton.onClick(() => {
 					new BotSettingsModal(this.plugin, () =>
 						enqueue(this.plugin, this.plugin.initTelegram, "bot"),
@@ -199,7 +200,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			});
 		// add link to botFather
 		const botFatherLink = document.createElement("div");
-		botFatherLink.textContent = "To create a new bot click on -> ";
+		botFatherLink.textContent = t("To create a new bot click on -> ");
 		botFatherLink.createEl("a", {
 			href: "https://t.me/botfather",
 			text: "@botFather",
@@ -209,27 +210,27 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 
 	async addUser() {
 		const hasSession = User.hasSession(this.plugin);
-		const description = this.containerEl.createDiv({ text: "Optional Telegram account connection for " });
+		const description = this.containerEl.createDiv({ text: t("Optional Telegram account connection for ") });
 		description.createEl("a", {
 			href: repositoryUrl + "/blob/main/docs/Authorized%20User%20Features.md",
-			text: "older messages, larger files, and transcription",
+			text: t("older messages, larger files, and transcription"),
 		});
 		new Setting(this.containerEl)
-			.setName("Telegram user")
-			.setDesc("Uses a separate direct connection to Telegram. The bot proxy applies to Bot API only.")
+			.setName(t("Telegram user"))
+			.setDesc(t("Uses a separate direct connection to Telegram. The bot proxy applies to Bot API only."))
 			.addText((status) => {
 				status.setDisabled(true);
 				status.setValue(
 					this.plugin.checkingUserConnection
-						? "Connecting…"
+						? t("Connecting…")
 						: this.plugin.userConnected
-							? (Client.clientUser?.username ?? "Connected")
-							: "Disconnected",
+							? (Client.clientUser?.username ?? t("Connected"))
+							: t("Disconnected"),
 				);
 			})
 			.addButton((button) =>
 				button
-					.setButtonText(hasSession ? "Log out" : "Log in")
+					.setButtonText(hasSession ? t("Log out") : t("Log in"))
 					.setDisabled(this.plugin.checkingUserConnection)
 					.onClick(async () => {
 						if (!hasSession) {
@@ -238,11 +239,11 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 						}
 						try {
 							await User.logOut(this.plugin);
-							displayAndLog(this.plugin, "Telegram user session revoked.", _15sec);
+							displayAndLog(this.plugin, t("Telegram user session revoked."), _15sec);
 						} catch {
 							displayAndLog(
 								this.plugin,
-								"Could not revoke the Telegram session. Retry when connected.",
+								t("Could not revoke the Telegram session. Retry when connected."),
 								_15sec,
 							);
 						}
@@ -252,7 +253,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			.addExtraButton((button) =>
 				button
 					.setIcon("refresh-ccw")
-					.setTooltip("Reconnect")
+					.setTooltip(t("Reconnect"))
 					.setDisabled(!hasSession || this.plugin.userConnected || this.plugin.checkingUserConnection)
 					.onClick(async () => {
 						const error = await User.connect(this.plugin);
@@ -264,7 +265,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 
 	addAdvancedSettings() {
 		new Setting(this.containerEl).addButton((button) =>
-			button.setButtonText("Advanced settings").onClick(() => new AdvancedSettingsModal(this.plugin).open()),
+			button.setButtonText(t("Advanced settings")).onClick(() => new AdvancedSettingsModal(this.plugin).open()),
 		);
 	}
 
@@ -276,7 +277,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			setting.setDesc(ruleInfo.description);
 			setting.addExtraButton(async (btn) => {
 				btn.setIcon("up-chevron-glyph")
-					.setTooltip("Move up")
+					.setTooltip(t("Move up"))
 					.onClick(async () => {
 						arrayMove(this.plugin.settings.messageDistributionRules, index, index - 1);
 						await this.plugin.saveSettings();
@@ -285,7 +286,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			});
 			setting.addExtraButton(async (btn) => {
 				btn.setIcon("down-chevron-glyph")
-					.setTooltip("Move down")
+					.setTooltip(t("Move down"))
 					.onClick(async () => {
 						arrayMove(this.plugin.settings.messageDistributionRules, index, index + 1);
 						await this.plugin.saveSettings();
@@ -294,7 +295,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			});
 			setting.addExtraButton(async (btn) => {
 				btn.setIcon("pencil")
-					.setTooltip("Edit")
+					.setTooltip(t("Edit"))
 					.onClick(async () => {
 						const messageDistributionRulesModal = new MessageDistributionRulesModal(
 							this.plugin,
@@ -308,7 +309,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			});
 			setting.addExtraButton(async (btn) => {
 				btn.setIcon("trash-2")
-					.setTooltip("Delete")
+					.setTooltip(t("Delete"))
 					.onClick(async () => {
 						this.plugin.settings.messageDistributionRules.remove(
 							this.plugin.settings.messageDistributionRules[index],
@@ -316,7 +317,9 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 						if (this.plugin.settings.messageDistributionRules.length == 0) {
 							displayAndLog(
 								this.plugin,
-								"The default message distribution rule has been created, as at least one rule must exist!",
+								t(
+									"The default message distribution rule has been created, as at least one rule must exist!",
+								),
 								_15sec,
 							);
 							this.plugin.settings.messageDistributionRules.push(createDefaultMessageDistributionRule());
@@ -328,7 +331,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(this.containerEl).addButton(async (btn: ButtonComponent) => {
-			btn.setButtonText("Add rule");
+			btn.setButtonText(t("Add rule"));
 			btn.setClass("mod-cta");
 			btn.onClick(async () => {
 				const messageDistributionRulesModal = new MessageDistributionRulesModal(this.plugin);
@@ -344,13 +347,15 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		const disabled = !this.plugin.userConnected;
 
 		new Setting(this.containerEl)
-			.setName("Process old messages")
+			.setName(t("Process old messages"))
 			.setDesc(
-				"During the plugin loading, unprocessed messages that are older than 24 hours and are not accessible to the bot will be forwarded to the same chat using the connected user's account. This action will enable the bot to detect and process these messages",
+				t(
+					"During the plugin loading, unprocessed messages that are older than 24 hours and are not accessible to the bot will be forwarded to the same chat using the connected user's account. This action will enable the bot to detect and process these messages",
+				),
 			)
 			.addButton((btn) => {
 				btn.setIcon("settings");
-				btn.setTooltip("Settings");
+				btn.setTooltip(t("Settings"));
 				btn.setDisabled(disabled);
 				btn.onClick(async () => {
 					const processOldMessagesSettingsModal = new ProcessOldMessagesSettingsModal(this.plugin);

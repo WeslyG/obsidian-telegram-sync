@@ -1,3 +1,4 @@
+import { t } from "src/settings/i18n";
 export enum ConditionType {
 	ALL = "all",
 	USER = "user",
@@ -87,22 +88,22 @@ export function extractConditionsFromFilterQuery(messageFilterQuery: string): Me
 		];
 	const filterQueryPattern = /\{\{([^{}=!~]+)(!=|!~|=|~)([^{}]+)\}\}/g;
 	const matches = [...query.matchAll(filterQueryPattern)];
-	if (!matches.length || query.replace(filterQueryPattern, "").trim()) throw new Error("Invalid filter query.");
+	if (!matches.length || query.replace(filterQueryPattern, "").trim()) throw new Error(t("Invalid filter query."));
 
 	return matches.map((match) => {
 		const [, conditionType, operation, rawValue] = match;
 		const value = rawValue.trim();
 
 		if (!value) {
-			throw new Error(`Empty value for condition type: ${conditionType}`);
+			throw new Error(t("Empty value for condition type: {type}", { type: conditionType }));
 		}
 
 		if (!Object.values(ConditionType).includes(conditionType as ConditionType)) {
-			throw new Error(`Unknown condition type: ${conditionType}`);
+			throw new Error(t("Unknown condition type: {type}", { type: conditionType }));
 		}
 
 		if (!Object.values(ConditionOperation).includes(operation as ConditionOperation)) {
-			throw new Error(`Unsupported filter operation: ${operation}`);
+			throw new Error(t("Unsupported filter operation: {operation}", { operation }));
 		}
 
 		return {
@@ -116,19 +117,21 @@ export function extractConditionsFromFilterQuery(messageFilterQuery: string): Me
 export function getMessageDistributionRuleInfo(distributionRule: MessageDistributionRule): MessageDistributionRuleInfo {
 	const messageDistributionRuleInfo: MessageDistributionRuleInfo = { name: "", description: "" };
 	if (distributionRule.notePathTemplate)
-		messageDistributionRuleInfo.description = `Note path: ${distributionRule.notePathTemplate}`;
+		messageDistributionRuleInfo.description = t("Note path: {path}", { path: distributionRule.notePathTemplate });
 	else if (distributionRule.templateFilePath)
-		messageDistributionRuleInfo.description = `Template file: ${distributionRule.templateFilePath}`;
+		messageDistributionRuleInfo.description = t("Template file: {path}", {
+			path: distributionRule.templateFilePath,
+		});
 	else if (distributionRule.filePathTemplate)
-		messageDistributionRuleInfo.description = `File path: ${distributionRule.filePathTemplate}`;
+		messageDistributionRuleInfo.description = t("File path: {path}", { path: distributionRule.filePathTemplate });
 	if (!distributionRule.messageFilterConditions || distributionRule.messageFilterConditions.length == 0) {
-		messageDistributionRuleInfo.name = "error: wrong filter query!";
+		messageDistributionRuleInfo.name = t("error: wrong filter query!");
 		return messageDistributionRuleInfo;
 	}
 
 	for (const condition of distributionRule.messageFilterConditions) {
 		if (condition.conditionType == ConditionType.ALL) {
-			messageDistributionRuleInfo.name = `filter = "all messages"`;
+			messageDistributionRuleInfo.name = t('filter = "all messages"');
 			return messageDistributionRuleInfo;
 		}
 		messageDistributionRuleInfo.name =

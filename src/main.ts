@@ -12,7 +12,7 @@ import * as User from "./telegram/user/user";
 import { enqueue } from "./utils/queues";
 import { clearHandleMediaGroupInterval } from "./telegram/bot/message/handlers";
 import ConnectionStatusIndicator, { checkConnectionMessage } from "./ConnectionStatusIndicator";
-import { mainDeviceIdSettingName } from "./settings/modals/BotSettings";
+import { t } from "./settings/i18n";
 import {
 	createDefaultMessageDistributionRule,
 	extractConditionsFromFilterQuery,
@@ -54,7 +54,7 @@ export default class TelegramSyncPlugin extends Plugin {
 			this.stopTelegram();
 			displayAndLog(
 				this,
-				`Paused on this device. If you want the plugin to work here, change the value of "${mainDeviceIdSettingName}" to the current device id in the bot settings.`,
+				t("Sync is paused on this device. To resume it here, select Use this device in the bot settings."),
 				0,
 			);
 			return;
@@ -290,11 +290,11 @@ export default class TelegramSyncPlugin extends Plugin {
 		if (this.botStatus == status && !error) return;
 
 		this.botStatus = status;
-		this.connectionStatusIndicator?.update(error ? new Error("Telegram Bot API connection failed.") : undefined);
+		this.connectionStatusIndicator?.update(error ? new Error(t("Telegram Bot API connection failed.")) : undefined);
 
 		if (this.isBotConnected()) displayAndLog(this, StatusMessages.BOT_CONNECTED, 0);
 		else if (!error) displayAndLog(this, StatusMessages.BOT_DISCONNECTED, 0);
-		else displayAndLogError(this, error, StatusMessages.BOT_DISCONNECTED, checkConnectionMessage, undefined, 0);
+		else displayAndLogError(this, error, StatusMessages.BOT_DISCONNECTED, checkConnectionMessage(), undefined, 0);
 	}
 
 	getBotToken(): string {

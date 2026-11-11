@@ -1,3 +1,4 @@
+import { t } from "src/settings/i18n";
 import { Modal, normalizePath, Setting } from "obsidian";
 import TelegramSyncPlugin from "../../main";
 import {
@@ -41,18 +42,22 @@ export class MessageDistributionRulesModal extends Modal {
 	}
 
 	private addHeader(container: HTMLDivElement) {
-		this.titleEl.setText(`${this.editing ? "Editing" : "Adding"} message distribution rule`);
+		this.titleEl.setText(
+			this.editing ? t("Editing message distribution rule") : t("Adding message distribution rule"),
+		);
 		new Setting(container).descEl.createEl("a", {
-			text: "🗎 User guide",
+			text: t("🗎 User guide"),
 			href: "https://github.com/WeslyG/obsidian-telegram-sync/blob/main/docs/Template%20Variables%20List.md",
 		});
 	}
 
 	private addMessageFilter(container: HTMLDivElement) {
 		const setting = new Setting(container)
-			.setName("Message filter")
+			.setName(t("Message filter"))
 			.setDesc(
-				"Conditions by which you would like to filter messages. Leave the field blank if you want to apply this rule to all messages",
+				t(
+					"Conditions by which you would like to filter messages. Leave the field blank if you want to apply this rule to all messages",
+				),
 			)
 			.addTextArea((text) => {
 				text.setValue(this.messageDistributionRule.messageFilterQuery)
@@ -61,18 +66,18 @@ export class MessageDistributionRulesModal extends Modal {
 						this.messageDistributionRule.messageFilterConditions =
 							extractConditionsFromFilterQuery(filterQuery);
 					})
-					.setPlaceholder("example: {{topic=Notes}}{{user=example_user}}");
+					.setPlaceholder(t("example: {{topic=Notes}}{{user=example_user}}"));
 			});
 		setSettingStyles(setting);
 	}
 
 	private addTemplateFilePath(container: HTMLDivElement) {
 		const setting = new Setting(container)
-			.setName("Template file path")
-			.setDesc("Specify path to template file you want to apply to new notes")
+			.setName(t("Template file path"))
+			.setDesc(t("Specify path to template file you want to apply to new notes"))
 			.addSearch((cb) => {
 				new FileSuggest(cb.inputEl, this.plugin);
-				cb.setPlaceholder("example: folder/zettelkasten.md")
+				cb.setPlaceholder(t("example: folder/zettelkasten.md"))
 					.setValue(this.messageDistributionRule.templateFilePath)
 					.onChange(async (path) => {
 						this.messageDistributionRule.templateFilePath = path ? normalizePath(path) : path;
@@ -83,12 +88,14 @@ export class MessageDistributionRulesModal extends Modal {
 
 	private addNotePathTemplate(container: HTMLDivElement) {
 		const setting = new Setting(container)
-			.setName("Note path template")
+			.setName(t("Note path template"))
 			.setDesc(
-				"Specify path template for storage folders and note names. Leave empty if you don't want to create any notes from filtrated messages",
+				t(
+					"Specify path template for storage folders and note names. Leave empty if you don't want to create any notes from filtrated messages",
+				),
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder(`example: folder/${defaultNoteNameTemplate}`)
+				text.setPlaceholder(t("Example: {path}", { path: `folder/${defaultNoteNameTemplate}` }))
 					.setValue(this.messageDistributionRule.notePathTemplate)
 					.onChange(async (value: string) => {
 						this.messageDistributionRule.notePathTemplate = value;
@@ -100,12 +107,14 @@ export class MessageDistributionRulesModal extends Modal {
 	private addFilePathTemplate(container: HTMLDivElement) {
 		const setting = new Setting(container);
 		setting
-			.setName("File path template")
+			.setName(t("File path template"))
 			.setDesc(
-				"Specify path template for storage folders and file names. Leave empty if you don't want to save any files from filtrated messages",
+				t(
+					"Specify path template for storage folders and file names. Leave empty if you don't want to save any files from filtrated messages",
+				),
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder(`example: folder/${defaultFileNameTemplate}`)
+				text.setPlaceholder(t("Example: {path}", { path: `folder/${defaultFileNameTemplate}` }))
 					.setValue(this.messageDistributionRule.filePathTemplate)
 					.onChange(async (value: string) => {
 						this.messageDistributionRule.filePathTemplate = value;
@@ -117,10 +126,10 @@ export class MessageDistributionRulesModal extends Modal {
 	private addHeading(container: HTMLDivElement) {
 		const setting = new Setting(container);
 		setting
-			.setName("Heading")
-			.setDesc("Specify the heading under which new messages will be inserted")
+			.setName(t("Heading"))
+			.setDesc(t("Specify the heading under which new messages will be inserted"))
 			.addText((text) => {
-				text.setPlaceholder(`example: ### Log`)
+				text.setPlaceholder(t("example: ### Log"))
 					.setValue(this.messageDistributionRule.heading)
 					.onChange(async (value: string) => {
 						this.messageDistributionRule.heading = value;
@@ -132,9 +141,11 @@ export class MessageDistributionRulesModal extends Modal {
 	private addMessageSortingMode(container: HTMLDivElement) {
 		const setting = new Setting(container);
 		setting
-			.setName("Reversed order")
+			.setName(t("Reversed order"))
 			.setDesc(
-				`Turn on to have new messages appear at the beginning of the note, or, if a heading is specified, above it. Warning: If "Parallel Message Processing" turn on, it may disrupt message order`,
+				t(
+					'Turn on to have new messages appear at the beginning of the note, or, if a heading is specified, above it. Warning: If "Parallel Message Processing" turn on, it may disrupt message order',
+				),
 			)
 			.addToggle((toggle) => {
 				toggle.setValue(this.messageDistributionRule.reversedOrder);
@@ -148,14 +159,14 @@ export class MessageDistributionRulesModal extends Modal {
 		container.createEl("br");
 		const footerButtons = new Setting(this.contentEl.createDiv());
 		footerButtons.addButton((b) => {
-			b.setTooltip("Submit")
+			b.setTooltip(t("Submit"))
 				.setIcon("checkmark")
 				.onClick(async () => {
 					const template = this.messageDistributionRule.templateFilePath;
 					const notePath = this.messageDistributionRule.notePathTemplate;
 					const filePath = this.messageDistributionRule.filePathTemplate;
 					if (!template && !notePath && !filePath) {
-						displayAndLog(this.plugin, "Please, fill at least one field", _15sec);
+						displayAndLog(this.plugin, t("Please, fill at least one field"), _15sec);
 						return;
 					}
 					if (
@@ -164,7 +175,9 @@ export class MessageDistributionRulesModal extends Modal {
 					) {
 						displayAndLog(
 							this.plugin,
-							`"Template file path", "Note path template" and "File path template" must not be equal to one another`,
+							t(
+								'"Template file path", "Note path template" and "File path template" must not be equal to one another',
+							),
 							_15sec,
 						);
 						return;
@@ -178,7 +191,7 @@ export class MessageDistributionRulesModal extends Modal {
 		});
 		footerButtons.addExtraButton((b) => {
 			b.setIcon("cross")
-				.setTooltip("Cancel")
+				.setTooltip(t("Cancel"))
 				.onClick(async () => {
 					await this.plugin.loadSettings();
 					this.saved = false;

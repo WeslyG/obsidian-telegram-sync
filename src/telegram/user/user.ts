@@ -1,3 +1,4 @@
+import { t } from "src/settings/i18n";
 import type TelegramSyncPlugin from "src/main";
 import * as Client from "./client";
 import { clearCachedUnprocessedMessages } from "./sync";
@@ -37,12 +38,12 @@ export function hasSession(plugin: TelegramSyncPlugin): boolean {
 }
 
 export async function connect(plugin: TelegramSyncPlugin, login?: Login): Promise<string | undefined> {
-	if (plugin.checkingUserConnection) return "Telegram user connection is already in progress.";
+	if (plugin.checkingUserConnection) return t("Telegram user connection is already in progress.");
 	const stored = readSession(plugin);
 	if (!stored && !login) return;
-	if (plugin.status === "unloading" || plugin.status === "unloaded") return "Telegram Sync is closing.";
+	if (plugin.status === "unloading" || plugin.status === "unloaded") return t("Telegram Sync is closing.");
 	if (plugin.settings.mainDeviceId && plugin.settings.mainDeviceId !== plugin.currentDeviceId)
-		return "Telegram Sync is paused on this device.";
+		return t("Telegram Sync is paused on this device.");
 
 	const credentials = login ?? stored;
 	if (!credentials) return;
@@ -52,7 +53,7 @@ export async function connect(plugin: TelegramSyncPlugin, login?: Login): Promis
 		credentials.apiId > 2147483647 ||
 		!/^[0-9a-f]{32}$/i.test(credentials.apiHash)
 	)
-		return "Enter a valid Telegram API ID and API hash.";
+		return t("Enter a valid Telegram API ID and API hash.");
 
 	plugin.checkingUserConnection = true;
 	const stopOnAbort = () => {
@@ -78,7 +79,7 @@ export async function connect(plugin: TelegramSyncPlugin, login?: Login): Promis
 		plugin.userConnected = true;
 	} catch {
 		await disconnect(plugin);
-		return login?.signal.aborted ? "Telegram login cancelled." : "Could not connect the Telegram user.";
+		return login?.signal.aborted ? t("Telegram login cancelled.") : t("Could not connect the Telegram user.");
 	} finally {
 		login?.signal.removeEventListener("abort", stopOnAbort);
 		plugin.checkingUserConnection = false;
@@ -86,7 +87,7 @@ export async function connect(plugin: TelegramSyncPlugin, login?: Login): Promis
 }
 
 export async function logOut(plugin: TelegramSyncPlugin) {
-	if (plugin.checkingUserConnection) throw new Error("Telegram user connection is already in progress.");
+	if (plugin.checkingUserConnection) throw new Error(t("Telegram user connection is already in progress."));
 	plugin.checkingUserConnection = true;
 	try {
 		const stored = readSession(plugin);

@@ -1,4 +1,5 @@
-import { ButtonComponent, Modal, Notice, Setting } from "obsidian";
+import { proxySettingsError, t } from "src/settings/i18n";
+import { Modal, Notice, Setting } from "obsidian";
 import type TelegramSyncPlugin from "src/main";
 import {
 	parseProxyUrl,
@@ -14,7 +15,7 @@ export class BotProxySettingsModal extends Modal {
 	}
 
 	onOpen() {
-		this.titleEl.setText("Bot proxy");
+		this.titleEl.setText(t("Bot proxy"));
 		const { proxyUrl, proxyAuthentication } = this.plugin.settings;
 		let protocol = "direct";
 		let address = "";
@@ -38,69 +39,56 @@ export class BotProxySettingsModal extends Modal {
 			}
 		}
 
-		const tabs = new Setting(this.contentEl);
-		const connectionPanel = this.contentEl.createDiv();
-		const authenticationPanel = this.contentEl.createDiv();
-		const connectionTab = new ButtonComponent(tabs.controlEl).setButtonText("Connection");
-		const authenticationTab = new ButtonComponent(tabs.controlEl).setButtonText("Authentication");
-		const selectTab = (showAuthentication: boolean) => {
-			connectionPanel.hidden = showAuthentication;
-			authenticationPanel.hidden = !showAuthentication;
-			connectionTab.buttonEl.toggleClass("mod-cta", !showAuthentication);
-			authenticationTab.buttonEl.toggleClass("mod-cta", showAuthentication);
-			connectionTab.buttonEl.setAttribute("aria-pressed", String(!showAuthentication));
-			authenticationTab.buttonEl.setAttribute("aria-pressed", String(showAuthentication));
-		};
-		connectionTab.onClick(() => selectTab(false));
-		authenticationTab.onClick(() => selectTab(true));
-		selectTab(false);
-
-		const connectionType = new Setting(connectionPanel).setName("Connection type");
-		const addressSetting = new Setting(connectionPanel);
-		connectionType.addDropdown((dropdown) =>
-			dropdown
-				.addOptions({ direct: "No proxy", http: "HTTP", https: "HTTPS", socks5: "SOCKS5" })
-				.setValue(protocol)
-				.onChange((value) => {
-					protocol = value;
-					addressSetting.setDisabled(value === "direct");
-				}),
-		);
-		addressSetting
-			.setName("Proxy address")
-			.setDesc("Hostname or IP address and port.")
+		const connectionType = new Setting(this.contentEl).setName(t("Connection type"));
+		const addressSetting = new Setting(this.contentEl)
+			.setName(t("Proxy address"))
+			.setDesc(t("Hostname or IP address and port."))
 			.addText((text) =>
 				text
 					.setPlaceholder("127.0.0.1:1080")
 					.setValue(address)
 					.onChange((value) => (address = value.trim())),
-			)
-			.setDisabled(protocol === "direct");
+			);
 
-		const authenticationToggle = new Setting(authenticationPanel)
-			.setName("Use proxy authentication")
-			.setDesc("Credentials are stored in Obsidian's secret storage on this device.");
-		const fields = authenticationPanel.createDiv();
-		authenticationToggle.addToggle((toggle) =>
+		const authenticationSetting = new Setting(this.contentEl)
+			.setName(t("Use proxy authentication"))
+			.setDesc(t("Credentials are stored in Obsidian's secret storage on this device."));
+		const fields = this.contentEl.createDiv();
+		const refreshFields = () => {
+			const direct = protocol === "direct";
+			addressSetting.setDisabled(direct);
+			authenticationSetting.setDisabled(direct);
+			fields.hidden = direct || !authentication;
+		};
+		authenticationSetting.addToggle((toggle) =>
 			toggle.setValue(authentication).onChange((value) => {
 				authentication = value;
-				fields.hidden = !value;
+				refreshFields();
 			}),
 		);
-		fields.hidden = !authentication;
-		new Setting(fields).setName("Username").addText((text) => {
-			text.inputEl.setAttribute("aria-label", "Proxy username");
+		new Setting(fields).setName(t("Username")).addText((text) => {
+			text.inputEl.setAttribute("aria-label", t("Proxy username"));
 			text.setValue(credentials.username).onChange((value) => (credentials.username = value));
 		});
-		new Setting(fields).setName("Password").addText((text) => {
+		new Setting(fields).setName(t("Password")).addText((text) => {
 			text.inputEl.type = "password";
-			text.inputEl.setAttribute("aria-label", "Proxy password");
+			text.inputEl.setAttribute("aria-label", t("Proxy password"));
 			text.setValue(credentials.password).onChange((value) => (credentials.password = value));
 		});
+		connectionType.addDropdown((dropdown) =>
+			dropdown
+				.addOptions({ direct: t("No proxy"), http: "HTTP", https: "HTTPS", socks5: "SOCKS5" })
+				.setValue(protocol)
+				.onChange((value) => {
+					protocol = value;
+					refreshFields();
+				}),
+		);
+		refreshFields();
 
 		new Setting(this.contentEl).addButton((button) =>
 			button
-				.setButtonText("Save")
+				.setButtonText(t("Save"))
 				.setCta()
 				.onClick(async () => {
 					button.setDisabled(true);
@@ -111,7 +99,7 @@ export class BotProxySettingsModal extends Modal {
 							if (authentication) validateProxyCredentials(url, credentials);
 						}
 					} catch (error) {
-						new Notice(error instanceof Error ? error.message : "Invalid proxy settings.");
+						new Notice(proxySettingsError(error));
 						button.setDisabled(false);
 						return;
 					}
@@ -134,7 +122,7 @@ export class BotProxySettingsModal extends Modal {
 						settings.proxyUrl = previousUrl;
 						settings.proxyAuthentication = previousAuthentication;
 						new Notice(
-							"Could not save proxy settings. Proxy authentication requires Obsidian 1.11.4 or later.",
+							t("Could not save proxy settings. Proxy authentication requires Obsidian 1.11.4 or later."),
 						);
 						button.setDisabled(false);
 						if (credentialsSaved) {
@@ -142,7 +130,7 @@ export class BotProxySettingsModal extends Modal {
 								saveProxyCredentials(this.app, previousCredentials);
 							} catch {
 								new Notice(
-									"Could not restore the previous proxy credentials in Obsidian secret storage.",
+									t("Could not restore the previous proxy credentials in Obsidian secret storage."),
 								);
 							}
 						}

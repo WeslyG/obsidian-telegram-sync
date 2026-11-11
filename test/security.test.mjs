@@ -16,8 +16,10 @@ const host = join(root, "node_modules", "obsidian");
 mkdirSync(host, { recursive: true });
 writeFileSync(
 	join(host, "index.js"),
-	`module.exports = {
+	`let language = "en";
+module.exports = {
 	Plugin: class {}, Modal: class {}, PluginSettingTab: class {}, AbstractInputSuggest: class {},
+	getLanguage: () => language, setTestLanguage: value => { language = value; },
 	TFile: class {}, TFolder: class {}, normalizePath: x => x, moment: require(${JSON.stringify(require.resolve("moment"))})
 };`,
 );
@@ -28,6 +30,8 @@ await build({
 			'export { handleMessage } from "./src/telegram/bot/message/handlers";',
 			'export { applyNoteContentTemplate } from "./src/telegram/bot/message/processors";',
 			'export { extractConditionsFromFilterQuery } from "./src/settings/messageDistribution";',
+			'export { createDefaultMessageDistributionRule, getMessageDistributionRuleInfo } from "./src/settings/messageDistribution";',
+			'export { t, proxySettingsError } from "./src/settings/i18n";',
 			'export { doesMessageMatchRule } from "./src/telegram/bot/message/filterEvaluations";',
 			'export { isAllowedMessage } from "./src/telegram/bot/access";',
 			'export { sanitizeFilePath } from "./src/utils/fsUtils";',
@@ -45,7 +49,31 @@ await build({
 	plugins: [portableTelegram],
 });
 const api = require(entry);
-const { TFile } = require(join(host, "index.js"));
+const { TFile, setTestLanguage } = require(join(host, "index.js"));
+
+test("Russian settings localize labels and validation while preserving paths and filter syntax", (testContext) => {
+	const rule = api.createDefaultMessageDistributionRule();
+	const before = structuredClone(rule);
+	testContext.after(() => setTestLanguage("en"));
+
+	setTestLanguage("ru-RU");
+	assert.equal(api.t("Bot proxy"), "Прокси для бота");
+	assert.equal(
+		api.t("example: {{topic=Notes}}{{user=example_user}}"),
+		"Пример: {{topic=Notes}}{{user=example_user}}",
+	);
+	assert.equal(api.getMessageDistributionRuleInfo(rule).description, "Путь к заметке: " + rule.notePathTemplate);
+	assert.throws(() => api.extractConditionsFromFilterQuery("{{неизвестно=1}}"), /Неизвестный тип условия/);
+	assert.equal(
+		api.proxySettingsError(new Error("Enter both the proxy username and password.")),
+		"Введите имя пользователя и пароль прокси.",
+	);
+	assert.deepEqual(rule, before);
+
+	setTestLanguage("de");
+	assert.equal(api.t("Bot proxy"), "Bot proxy");
+	assert.equal(api.getMessageDistributionRuleInfo(rule).description, "Note path: " + rule.notePathTemplate);
+});
 
 test("the bundled MTProto client can load an existing WebSocket session without native add-ons", async () => {
 	const address = Buffer.from("pluto.web.telegram.org");

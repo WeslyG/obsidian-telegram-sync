@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.0 (2026-11-11)
+
+- Translate the settings and setup dialogs into Russian. Use the language selected in Obsidian.
+- Place the proxy authentication switch and credentials immediately below the proxy address.
+- Make the Russian README the default and provide a separate English version.
+
 ## 5.0.0 (2026-11-11)
 
 - Add HTTP, HTTPS, and SOCKS5 support for the Bot API, with proxy authentication configured separately.

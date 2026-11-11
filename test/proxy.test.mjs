@@ -179,7 +179,7 @@ test("proxy credentials stay separate from the address", () => {
 	saveProxyCredentials(app, credentials);
 	assert.deepEqual(readProxyCredentials(app), credentials);
 	assert.equal(createBotProxyAgent(""), undefined);
-	assert.throws(() => createBotProxyAgent("http://user:password@proxy.test:8080"), /Authentication tab/);
+	assert.throws(() => createBotProxyAgent("http://user:password@proxy.test:8080"), /below the proxy address/);
 	assert.throws(
 		() => createBotProxyAgent("socks5://proxy.test:1080", { username: "user", password: "я".repeat(128) }),
 		/255 bytes/,

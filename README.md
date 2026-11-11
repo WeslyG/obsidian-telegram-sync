@@ -1,64 +1,33 @@
-# Telegram Sync for Obsidian
+# Telegram Sync для Obsidian
 
-<a href="https://github.com/WeslyG/obsidian-telegram-sync/releases/latest">
-<img src="https://img.shields.io/github/v/release/WeslyG/obsidian-telegram-sync?label=plugin&display_name=tag&logo=obsidian&color=purple&logoColor=violet">
-</a>&nbsp;<a href="https://github.com/WeslyG/obsidian-telegram-sync">
-<img src="https://img.shields.io/github/downloads/WeslyG/obsidian-telegram-sync/total?logo=github">
-</a><br><br>
+[English](./readme_en.md) · [Скачать релиз](https://github.com/WeslyG/obsidian-telegram-sync/releases/latest) · [История изменений](./CHANGELOG.md)
 
-Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsidian](https://obsidian.md/) vault. You can save text, voice transcripts, images, and other files from your Telegram chats to Obsidian for further processing and organization. The plugin is available for desktop Obsidian. This fork is maintained by [WeslyG](https://github.com/WeslyG/obsidian-telegram-sync).
+Telegram Sync переносит сообщения и файлы из Telegram в хранилище Obsidian. Сообщения можно сохранять в отдельные заметки или добавлять к существующим. Правила позволяют отбирать сообщения и задавать шаблоны заметок, имена файлов и папки.
 
----
+## Установка
 
-## 📚 Table of Contents
+Нужен Obsidian 1.11.4 или новее для Windows, macOS или Linux.
 
--   [Features](#-features)
--   [Installation](#-installation)
--   [Usage](#-usage)
--   [Bot proxy](#bot-proxy)
--   [Contributing](#-contributing)
+1. Скачайте `main.js`, `manifest.json` и `styles.css` из [последнего релиза на GitHub](https://github.com/WeslyG/obsidian-telegram-sync/releases/latest).
+2. Поместите эти файлы в папку `.obsidian/plugins/telegram-sync/` внутри хранилища. При обновлении замените три файла релиза и сохраните `data.json`.
+3. Перезапустите Obsidian и включите **Telegram Sync** в разделе **Настройки → Сторонние плагины**.
 
-## 🚀 Features
+Интерфейс плагина автоматически отображается на русском, если русский выбран в Obsidian. Для остальных языков используется английский.
 
--   Synchronize text messages and files
--   Save messages as individual notes or append to an existing note
--   Transcript voices and video notes (for Telegram Premium subscribers only)
--   Use customizable templates for new notes
--   Set folders for new notes and files
--   Automatically format text messages with markdown
--   Delete processed messages from Telegram
--   Connect the Telegram bot through HTTP, HTTPS, or SOCKS5 with optional authentication
+## Подключение бота
 
-## 📦 Installation
+1. Создайте бота через [@BotFather](https://t.me/botfather) или возьмите токен существующего бота.
+2. В Obsidian откройте **Настройки → Telegram Sync**. Нажмите **Подключить**, введите **Токен бота** и укажите имена пользователей или ID чатов в поле **Разрешённые чаты**. Пустой список блокирует импорт.
+3. Сохраните настройки и отправьте боту сообщение. Импорт выполняется, пока Obsidian открыт.
 
-Requires desktop Obsidian 1.11.4 or later. See [bot token storage](./docs/Bot%20Token%20Encryption.md) before upgrading an existing installation.
+Токен хранится в локальной связке ключей Obsidian. Если обновляетесь с версии 4.x и использовали зашифрованный токен, введите его заново. [Подробнее об обновлении](./docs/Bot%20Token%20Encryption.md)
 
-1. Download `main.js`, `styles.css`, and `manifest.json` from [GitHub Releases](https://github.com/WeslyG/obsidian-telegram-sync/releases).
-2. Copy the downloaded files to <path-to-your-vault>/.obsidian/plugins/telegram-sync/
-3. Restart Obsidian and enable **Telegram Sync** in the Community plugins tab
+## Прокси для бота
 
-## 📮 Usage
+Откройте **Настройки → Telegram Sync → Прокси для бота → Настроить**. Выберите **HTTP**, **HTTPS** или **SOCKS5** и укажите хост и порт, например `127.0.0.1:9091`. Если прокси требует логин и пароль, включите **Использовать авторизацию на прокси** сразу под полем **Адрес прокси** и заполните появившиеся поля. [Руководство по прокси](./docs/Bot%20Proxy.md)
 
-1. Create a new bot on Telegram by talking to the [@botFather](https://t.me/botfather)
-2. Copy the bot token provided by the @botFather
-3. Open the Obsidian settings and navigate to the **Telegram Sync** settings tab
-4. Paste your bot token to **Bot > Connect > Bot Token** field
-5. Add your Telegram username or a chat ID to **Allowed chats**. An empty list blocks all imports.
-6. Start sending messages and files to your Telegram bot
-7. When the Obsidian app is running on your laptop or PC, it syncs all your messages
-8. You can optionally add your bot to any chats that you want to sync (the bot needs admin rights)
+## Дополнительные возможности
 
-### Bot proxy
-
-Open **Settings → Telegram Sync → Bot proxy → Configure**. Choose a protocol in **Connection** and enter the host and port. Use **Authentication** to turn username and password on or off. See the [bot proxy setup guide](./docs/Bot%20Proxy.md) for examples and troubleshooting.
-
-## 💻 Contributing
-
-If you're thinking about contributing, please check out the [Contributing Guide](./CONTRIBUTING.md) first. And a heartfelt thank you to everyone who has already contributed - your help is greatly appreciated!
-<br>
-
-<div align="center">
-<a href="https://github.com/WeslyG/obsidian-telegram-sync/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=WeslyG/obsidian-telegram-sync" />
-</a>
-</div>
+- [Шаблоны и фильтры](./docs/Template%20Variables%20List.md) для распределения сообщений.
+- [Подключение личного аккаунта](./docs/Authorized%20User%20Features.md) для импорта старых сообщений и больших файлов. Для расшифровки аудио нужен Telegram Premium. Аккаунт подключается к Telegram напрямую.
+- [Политика конфиденциальности](./PRIVACY-POLICY.md) и [руководство для участников проекта](./CONTRIBUTING.md).

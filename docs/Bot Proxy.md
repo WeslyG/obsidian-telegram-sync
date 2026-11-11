@@ -5,7 +5,7 @@ The proxy carries Telegram Bot API requests, including polling and file download
 ## Connection
 
 1. Open **Obsidian → Settings → Telegram Sync → Bot proxy → Configure**.
-2. On **Connection**, select the protocol offered by your proxy and enter its hostname or IP address and port.
+2. Under **Connection type**, select the protocol offered by your proxy. Enter its hostname or IP address and port under **Proxy address**.
 
     | Connection type | Example address         | Use when                                                                                |
     | --------------- | ----------------------- | --------------------------------------------------------------------------------------- |
@@ -19,7 +19,7 @@ The proxy carries Telegram Bot API requests, including polling and file download
 
 ## Authentication
 
-On the **Authentication** tab, enable **Use proxy authentication** and fill in **Username** and **Password**. Leave the switch off for an anonymous proxy. HTTP and HTTPS use Basic proxy authentication. SOCKS5 uses username/password authentication. Obsidian 1.11.4 or later is required to save credentials in Obsidian's local secret storage. Set them separately on each device that needs the proxy.
+Below **Proxy address**, enable **Use proxy authentication** and fill in **Username** and **Password**. Leave the switch off for an anonymous proxy. HTTP and HTTPS use Basic proxy authentication. SOCKS5 uses username/password authentication. Obsidian 1.11.4 or later is required to save credentials in Obsidian's local secret storage. Set them separately on each device that needs the proxy.
 
 HTTP and SOCKS5 proxy credentials travel without TLS between Obsidian and the proxy. Use a local or trusted network path for those listeners, or an HTTPS proxy to protect credentials in transit to the proxy itself.
 

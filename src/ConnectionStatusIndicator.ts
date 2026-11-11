@@ -1,15 +1,12 @@
 import { setIcon } from "obsidian";
 import TelegramSyncPlugin from "./main";
+import { t } from "./settings/i18n";
 
-export const connectionStatusIndicatorSettingName = "Connection status indicator";
-export enum ConnectionStatusIndicatorType {
-	HIDDEN = "never show, log the errors",
-	CONSTANT = "show constantly all states",
-	ONLY_WHEN_ERRORS = "show only when connection errors",
-}
-export type KeysOfConnectionStatusIndicatorType = keyof typeof ConnectionStatusIndicatorType;
-export const checkConnectionMessage =
-	"Check internet (proxy) connection, the functionality of Telegram using the official app. If everything is ok, restart Obsidian.";
+export type KeysOfConnectionStatusIndicatorType = "HIDDEN" | "CONSTANT" | "ONLY_WHEN_ERRORS";
+export const checkConnectionMessage = () =>
+	t(
+		"Check your internet or proxy connection and confirm that the official Telegram app works. Then restart Obsidian.",
+	);
 
 export default class ConnectionStatusIndicator {
 	plugin: TelegramSyncPlugin;
@@ -62,7 +59,7 @@ export default class ConnectionStatusIndicator {
 		if (!this.icon) return;
 		this.icon.setAttrs({
 			"data-tooltip-position": "top",
-			"aria-label": `${error || ""}\n${checkConnectionMessage}`.trimStart(),
+			"aria-label": `${error || ""}\n${checkConnectionMessage()}`.trimStart(),
 		});
 		this.label?.setAttr("style", "position: relative; left: -3px; bottom: -3px; font-weight: bold; color:red;");
 		this.label?.setText("x");

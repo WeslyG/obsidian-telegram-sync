@@ -20,7 +20,7 @@ export function readProxyCredentials(app: App): ProxyCredentials | undefined {
 		const credentials = JSON.parse(stored);
 		if (typeof credentials?.username === "string" && typeof credentials?.password === "string") return credentials;
 	} catch {
-		// Let the user replace an invalid stored value in the Authentication tab.
+		// Let the user replace an invalid stored value in proxy settings.
 	}
 }
 
@@ -37,7 +37,7 @@ export function parseProxyUrl(value: string): URL {
 	} catch {
 		throw new Error("Enter a valid proxy hostname or IP address and port.");
 	}
-	if (value.includes("@")) throw new Error("Enter the username and password in the Authentication tab.");
+	if (value.includes("@")) throw new Error("Enter the username and password below the proxy address.");
 	if (
 		!["http:", "https:", "socks5:", "socks5h:"].includes(url.protocol) ||
 		!url.hostname ||

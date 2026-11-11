@@ -1,3 +1,4 @@
+import { t } from "src/settings/i18n";
 import type { Message } from "src/telegram/bot/apiTypes";
 import { Api, utils } from "teleproto";
 import { isAllowedChat } from "../bot/access";
@@ -52,26 +53,26 @@ export function getDefaultProcessOldMessagesSettings(): ProcessOldMessagesSettin
 
 export async function getChatsForSearch(plugin: TelegramSyncPlugin, offsetDays: number): Promise<ChatForSearch[]> {
 	let progress = "\n\n...";
-	let notification = `1 of 3\nSearching for chats with activity in the last "${offsetDays}" days`;
+	let notification = t("1 of 3\nSearching for chats with activity in the last {days} days", { days: offsetDays });
 	const notice = new Notice(notification + progress, _day);
 	const { checkedClient } = await checkUserService();
 	const botUserName = plugin.botUser?.username;
 	if (!botUserName) {
-		notice.setMessage("Can't execute searching for chats because can't identify bot username");
+		notice.setMessage(t("Can't execute searching for chats because can't identify bot username"));
 		return [];
 	}
 	let allDialogs: Awaited<ReturnType<typeof checkedClient.getDialogs<false>>>[number][] = [];
 	try {
 		allDialogs = await checkedClient.getDialogs({ limit: plugin.settings.processOldMessagesSettings.dialogsLimit });
 	} catch {
-		notice.setMessage("Could not list Telegram chats.");
+		notice.setMessage(t("Could not list Telegram chats."));
 	}
 	allDialogs = allDialogs.filter(
 		(dialog) =>
 			(!dialog.isUser || dialog.id?.toJSNumber() == plugin.botUser?.id) &&
 			(dialog.date ?? 0) > getOffsetDate(offsetDays),
 	);
-	notification = `${notification}\n\n2 of 3\nFiltering chats by bot "${botUserName}"`;
+	notification = notification + "\n\n" + t('2 of 3\nFiltering chats by bot "{bot}"', { bot: botUserName });
 	const chatsForSearch: ChatForSearch[] = [];
 	for (const dialog of allDialogs) {
 		notice.setMessage(notification + progress);
@@ -90,12 +91,12 @@ export async function getChatsForSearch(plugin: TelegramSyncPlugin, offsetDays: 
 			});
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("CHAT_ADMIN_REQUIRED")) continue;
-			notice.setMessage("Could not check participants in a Telegram chat.");
+			notice.setMessage(t("Could not check participants in a Telegram chat."));
 		}
 		if (participants.length > 0) chatsForSearch.push({ name: dialogName, peer });
 	}
 	notice.hide();
-	new Notice(`${notification}\n\n3 of 3\nDone`, _5sec);
+	new Notice(notification + "\n\n" + t("3 of 3\nDone"), _5sec);
 	return chatsForSearch;
 }
 
