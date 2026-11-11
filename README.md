@@ -59,6 +59,12 @@ Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsi
 7. When the Obsidian app is running on your laptop or PC, it syncs all your messages
 8. You can optionally add your bot to any chats that you want to sync (the bot needs admin rights)
 
+### Bot proxy
+
+Open **Settings → Telegram Sync → Bot proxy → Configure**. In **Connection**, choose HTTP, HTTPS, or SOCKS5 and enter the proxy host and port. If the proxy requires credentials, turn on **Use proxy authentication** in **Authentication**, enter the username and password, and click **Save**. Authentication uses Obsidian's local secret storage and requires Obsidian 1.11.4 or later.
+
+This setting applies to Telegram Bot API requests, including polling and file downloads.
+
 ## 💁 Supporters & Donations
 
 Big thanks to everyone who's already been supporting this project - you rock!

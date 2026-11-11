@@ -4,6 +4,7 @@ import TelegramBot from "node-telegram-bot-api";
 import { createProgressBar, updateProgressBar, deleteProgressBar, ProgressBarType } from "src/telegram/bot/progressBar";
 import * as Client from "src/telegram/user/client";
 import { BotSettingsModal } from "./modals/BotSettings";
+import { BotProxySettingsModal } from "./modals/BotProxySettings";
 import { UserLogInModal } from "./modals/UserLogin";
 import {
 	releaseVersion,
@@ -68,6 +69,8 @@ export interface TelegramSyncSettings {
 	processOldMessagesSettings: ProcessOldMessagesSettings;
 	processOtherBotsMessages: boolean;
 	retryFailedMessagesProcessing: boolean;
+	proxyUrl: string;
+	proxyAuthentication: boolean;
 	// add new settings above this line
 	topicNames: Topic[];
 }
@@ -92,6 +95,8 @@ export const DEFAULT_SETTINGS: TelegramSyncSettings = {
 	processOldMessagesSettings: getDefaultProcessOldMessagesSettings(),
 	processOtherBotsMessages: false,
 	retryFailedMessagesProcessing: false,
+	proxyUrl: "",
+	proxyAuthentication: false,
 	// add new settings above this line
 	topicNames: [],
 };
@@ -147,6 +152,12 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		this.addSettingsHeader();
 
 		await this.addBot();
+		new Setting(this.containerEl)
+			.setName("Bot proxy")
+			.setDesc("Connect the Telegram bot through an HTTP or SOCKS5 proxy.")
+			.addButton((button) =>
+				button.setButtonText("Configure").onClick(() => new BotProxySettingsModal(this.plugin).open()),
+			);
 		await this.addUser();
 		this.addAdvancedSettings();
 

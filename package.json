@@ -42,12 +42,15 @@
 	"dependencies": {
 		"@popperjs/core": "^2.11.7",
 		"@types/qrcode": "^1.5.0",
+		"agent-base": "^7.1.0",
 		"compare-versions": "^6.1.0",
+		"https-proxy-agent": "^7.0.2",
 		"linkify-it": "^4.0.1",
 		"mime-types": "^2.1.35",
 		"node-machine-id": "^1.1.12",
 		"node-telegram-bot-api": "^0.66.0",
 		"qrcode": "^1.5.3",
+		"socks": "^2.7.1",
 		"telegram": "^2.25.11"
 	}
 }
