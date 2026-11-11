@@ -8,8 +8,6 @@ import {
 	toArrayBuffer,
 } from "src/utils/fsUtils";
 import * as release from "../../../../release-notes.mjs";
-import { donationInlineKeyboard } from "./donation";
-import { SendMessageOptions } from "node-telegram-bot-api";
 import path from "path";
 import * as Client from "../../user/client";
 import { extension } from "mime-types";
@@ -73,7 +71,6 @@ export async function handleMessage(plugin: TelegramSyncPlugin, msg: TelegramBot
 		}`;
 
 	// Skip processing if the message is a "/start" command
-	// https://github.com/soberhacker/obsidian-telegram-sync/issues/109
 	if (msg.text === "/start") {
 		return;
 	}
@@ -410,14 +407,8 @@ export async function ifNewReleaseThenShowChanges(plugin: TelegramSyncPlugin, ms
 	plugin.settings.pluginVersion = release.releaseVersion;
 	await plugin.saveSettings();
 
-	if (plugin.userConnected && (await Client.subscribedOnInsiderChannel())) return;
-
 	if (plugin.settings.pluginVersion && release.showNewFeatures) {
-		const options: SendMessageOptions = {
-			parse_mode: "HTML",
-			reply_markup: { inline_keyboard: donationInlineKeyboard },
-		};
-		await plugin.bot?.sendMessage(msg.chat.id, release.notes, options);
+		await plugin.bot?.sendMessage(msg.chat.id, release.notes, { parse_mode: "HTML" });
 	}
 
 	if (plugin.settings.pluginVersion && release.showBreakingChanges && !plugin.userConnected) {

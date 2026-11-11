@@ -1,5 +1,6 @@
 import { Modal, Setting } from "obsidian";
 import TelegramSyncPlugin from "src/main";
+import { proxyGuideLink, repositoryUrl } from "release-notes.mjs";
 import { _5sec, displayAndLog } from "src/utils/logUtils";
 import { PinCodeModal } from "./PinCode";
 
@@ -31,14 +32,10 @@ export class BotSettingsModal extends Modal {
 		lim24Hours.style.marginLeft = "10px";
 		const limBlocks = document.createElement("div");
 		limBlocks.style.marginLeft = "10px";
-		limBlocks.setText("- Use VPN or proxy to bypass blocks in China, Iran, and limited corporate networks ");
+		limBlocks.setText("- If the bot cannot connect directly, see the ");
 		limBlocks.createEl("a", {
-			href: "https://github.com/soberhacker/obsidian-telegram-sync/issues/225#issuecomment-1780539957",
-			text: "([ex. config of Clash],",
-		});
-		limBlocks.createEl("a", {
-			href: "https://github.com/windingblack/obsidian-global-proxy",
-			text: " [Obsidian Global Proxy])",
+			href: proxyGuideLink,
+			text: "bot proxy setup guide",
 		});
 		limitations.descEl.appendChild(lim24Hours);
 		limitations.descEl.appendChild(limBlocks);
@@ -71,7 +68,7 @@ export class BotSettingsModal extends Modal {
 			)
 			.addTextArea((text) => {
 				const textArea = text
-					.setPlaceholder("example: soberhacker,1227636")
+					.setPlaceholder("example: example_user,1227636")
 					.setValue(this.plugin.settings.allowedChats.join(", "))
 					.onChange(async (value: string) => {
 						value = value.replace(/\s/g, "");
@@ -156,7 +153,7 @@ export class BotSettingsModal extends Modal {
 				});
 			});
 		botTokenSetting.descEl.createEl("a", {
-			href: "https://github.com/soberhacker/obsidian-telegram-sync/blob/main/docs/Bot%20Token%20Encryption.md",
+			href: `${repositoryUrl}/blob/main/docs/Bot%20Token%20Encryption.md`,
 			text: "What does this can prevent?",
 		});
 	}

@@ -132,15 +132,3 @@ export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 	if (!(buffer instanceof ArrayBuffer)) return Uint8Array.from(bytes).buffer;
 	return byteOffset === 0 && byteLength === buffer.byteLength ? buffer : buffer.slice(byteOffset, byteOffset + byteLength);
 }
-
-export async function replaceMainJs(vault: Vault, mainJs: Buffer | "main-prod.js") {
-	const mainJsPath = normalizePath(vault.configDir + "/plugins/telegram-sync/main.js");
-	const mainProdJsPath = normalizePath(vault.configDir + "/plugins/telegram-sync/main-prod.js");
-	if (mainJs instanceof Buffer) {
-		await vault.adapter.writeBinary(mainProdJsPath, await vault.adapter.readBinary(mainJsPath));
-		await vault.adapter.writeBinary(mainJsPath, toArrayBuffer(mainJs));
-	} else {
-		if (!(await vault.adapter.exists(mainProdJsPath))) return;
-		await vault.adapter.writeBinary(mainJsPath, await vault.adapter.readBinary(mainProdJsPath));
-	}
-}

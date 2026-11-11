@@ -38,7 +38,8 @@
 		"Messages",
 		"Transfer Files"
 	],
-	"author": "soberhacker",
+	"maintainers": ["WeslyG"],
+	"repository": "https://github.com/WeslyG/obsidian-telegram-sync.git",
 	"license": "GNU Affero General Public License v3.0",
 	"devDependencies": {
 		"@types/mime-types": "^3.0.1",

@@ -1,12 +1,6 @@
 ## 📢 How You Can Contribute Effectively
 
-To ensure your contributions have the greatest impact, there are two important steps to follow:
-
-1. **Notify About Your Task 📨**  
-   Before starting work on a specific task (bug fix or feature enhancement), please send me a direct message [@soberhacker](https://t.me/soberhacker). Let me know which issue you intend to work on, so I can mark it as being in progress by you.
-
-2. **Earn Stars for Your Work 🌟**  
-   If the task you're working on is mentioned on the [Telegram channel](https://t.me/obsidian_telegram_sync), all stars related to that feature or bug will be credited to you once your pull request is successfully merged. This helps acknowledge your contribution to the community and highlights the real value of your work.
+Use [repository issues](https://github.com/WeslyG/obsidian-telegram-sync/issues) to discuss bug fixes and feature proposals. Reference the relevant issue in your pull request.
 
 ---
 
@@ -42,7 +36,7 @@ I'm thrilled you're considering making a contribution to my project! The process
 
 8. **Push Your Changes**: Push your changes to your fork on GitHub by running `git push origin [branch-name]`.
 
-9. **Create a Pull Request** targeting `main`. The **Check and build** job runs the same checks as the local build and uploads the plugin files as a `telegram-sync` artifact.
+9. **Create a Pull Request** targeting `main`. The **Check and build** job runs the same checks as the local build. Runs on `main` upload the plugin files as a `telegram-sync` artifact.
 
 **🤝 Important Note**: Please make sure to adhere to the coding and commit standards. Commits that do not comply may be rejected.
 
@@ -51,5 +45,5 @@ Thank you for being part of this journey! Your contributions are what keep the p
 ## Publishing a release
 
 1. Run `npm version minor --no-git-tag-version` (or `patch` or `major` as appropriate). Commit the resulting changes to `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` when the minimum Obsidian version changes.
-2. Once the release commit is on `main`, tag that commit with the exact manifest version, for example `git tag 4.1.0 <commit>`. Push it with `git push origin 4.1.0`.
-3. The Release workflow verifies the tag and version files, runs CI, and publishes `main.js`, `manifest.json`, and `styles.css` with GitHub-generated release notes.
+2. When the release commit is at the tip of `main`, tag it with the exact manifest version, for example `git tag 4.1.0 <commit>`. Push it with `git push origin 4.1.0`.
+3. In [Actions → Release](https://github.com/WeslyG/obsidian-telegram-sync/actions/workflows/release.yml), select **Run workflow**, choose `main`, and enter the tag without a `v` prefix. The workflow verifies that the tag points to the `main` commit selected for the run, then builds and publishes `main.js`, `manifest.json`, and `styles.css`.

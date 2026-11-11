@@ -1,6 +1,6 @@
 import { Api, TelegramClient } from "telegram";
 import { StoreSession } from "telegram/sessions";
-import { releaseVersion, versionALessThanVersionB } from "release-notes.mjs";
+import { releaseVersion } from "release-notes.mjs";
 import TelegramBot from "node-telegram-bot-api";
 import QRCode from "qrcode";
 import os from "os";
@@ -11,7 +11,6 @@ import { formatDateTime } from "src/utils/dateUtils";
 import { LogLevel, Logger } from "telegram/extensions/Logger";
 import { _1min, _5sec } from "src/utils/logUtils";
 import * as config from "./config";
-import bigInt from "big-integer";
 import { PromisedWebSockets } from "telegram/extensions";
 
 export type SessionType = "bot" | "user";
@@ -32,7 +31,6 @@ export function getNewSessionId(): number {
 	return Number(formatDateTime(new Date(), "YYYYMMDDHHmmssSSS"));
 }
 
-export const insiderChannel = new Api.PeerChannel({ channelId: bigInt("1913400014") });
 
 // Stop the bot polling
 export async function stop() {
@@ -296,36 +294,4 @@ export async function transcribeAudio(
 	if (!_voiceTranscripts.has(`${botMsg.chat.id}_${botMsg.message_id}`))
 		_voiceTranscripts.set(`${botMsg.chat.id}_${botMsg.message_id}`, transcribedAudio.text);
 	return transcribedAudio.text;
-}
-
-export async function subscribedOnInsiderChannel(): Promise<boolean> {
-	if (!client || !client.connected || _sessionType == "bot") return false;
-	try {
-		const { checkedClient } = await checkUserService();
-		const messages = await checkedClient.getMessages(insiderChannel, { limit: 1 });
-		return messages.length > 0;
-	} catch (e) {
-		return false;
-	}
-}
-
-export async function getLastBetaRelease(currentVersion: string): Promise<{ betaVersion: string; mainJs: Buffer }> {
-	const { checkedClient } = await checkUserService();
-	const messages = await checkedClient.getMessages(insiderChannel, {
-		limit: 10,
-		filter: new Api.InputMessagesFilterDocument(),
-		search: "-beta.",
-	});
-	if (messages.length == 0) throw new Error("No beta versions in Insider channel!");
-	const message = messages[0];
-	const match = message.message.match(/Obsidian Telegram Sync (\S+)/);
-	const betaVersion = match ? match[1] : "";
-	if (!betaVersion) throw new Error("Can't find the version label in the message: " + message.message);
-	if (versionALessThanVersionB(betaVersion, currentVersion))
-		throw new Error(
-			`The last beta version ${betaVersion} can't be installed because it less than current version ${currentVersion}!`,
-		);
-	const mainJs = (await messages[0].downloadMedia()) as Buffer;
-	if (!mainJs) throw new Error("Can't find main.js in the last 10 messages of Insider channel");
-	return { betaVersion: betaVersion, mainJs };
 }

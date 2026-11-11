@@ -270,7 +270,6 @@ function prepareIfPath(isPath: boolean, value: string): string {
 }
 
 // Copy tab and blockquotes to every new line of {{content*}} or {{voiceTranscript*}} if they are placed in front of this variables.
-// https://github.com/soberhacker/obsidian-telegram-sync/issues/131
 function addLeadingForEveryLine(text: string, leadingChars?: string): string {
 	if (!leadingChars) return text;
 	return text

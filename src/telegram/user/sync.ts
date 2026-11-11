@@ -1,5 +1,5 @@
 import { Api } from "telegram";
-import { checkUserService, clientUser, subscribedOnInsiderChannel } from "./client";
+import { checkUserService, clientUser } from "./client";
 import { getOffsetDate } from "src/utils/dateUtils";
 import TelegramSyncPlugin from "src/main";
 import { Dialog } from "telegram/tl/custom/dialog";
@@ -178,8 +178,8 @@ export async function getUnprocessedMessages(plugin: TelegramSyncPlugin): Promis
 }
 
 export async function forwardUnprocessedMessages(plugin: TelegramSyncPlugin) {
+	if (!plugin.userConnected) return;
 	const processOldMessagesSettings = plugin.settings.processOldMessagesSettings;
-	if (!(await subscribedOnInsiderChannel())) return;
 	if (processOldMessagesSettings.chatsForSearch.length == 0) {
 		displayAndLog(plugin, "Processing old messages is skipped because chats for search are not listed", 0);
 		return;

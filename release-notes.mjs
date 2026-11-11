@@ -1,45 +1,22 @@
 // TODO translating messages
-// TODO notify in setting tab and bottom panel that new beta version is ready for installing
 // TODO add messagesLeftCnt displaying in status bar
 // TODO NEXT: sending notes from Obsidian to Telegram
-// TODO MED:  "delete messages from Telegram" settings for each distribution rules
+// TODO MED: "delete messages from Telegram" settings for each distribution rules
 // TODO NEXT: save files if no template file
 // TODO NEXT: check reconnecting
-// TODO NEXT: bur in reconnecting on MacBook https://t.me/sm1rnov_id
-import { compareVersions } from "compare-versions";
 import manifest from "./manifest.json" with { type: "json" };
+
 export const releaseVersion = manifest.version;
+export const repositoryUrl = manifest.authorUrl;
+export const proxyGuideLink = `${repositoryUrl}/blob/main/docs/Bot%20Proxy.md`;
+export const privacyPolicyLink = `${repositoryUrl}/blob/main/PRIVACY-POLICY.md`;
 export const showNewFeatures = true;
 export let showBreakingChanges = releaseVersion === "4.0.0";
 
-const newFeatures = `See the <a href='https://github.com/WeslyG/obsidian-telegram-sync/releases/tag/${releaseVersion}'>release notes</a> for changes in this version.`;
+const newFeatures = `See the <a href='${repositoryUrl}/releases/tag/${releaseVersion}'>release notes</a> for changes in this version.`;
 export const breakingChanges = `⚠️ <b><i>Breaking changes!\n\nBot token may need to be re-entered.</i></b> ⚠️`;
-export const telegramChannelLink = "https://t.me/obsidian_telegram_sync";
-export const insiderFeaturesLink =
-	"https://github.com/soberhacker/obsidian-telegram-sync/blob/main/docs/Telegram%20Sync%20Insider%20Features.md";
-const telegramChannelAHref = `<a href='${telegramChannelLink}'>channel</a>`;
-const insiderFeaturesAHref = `<a href='${insiderFeaturesLink}'>insider features</a>`;
-const telegramChannelIntroduction = `Subscribe for free to the plugin's ${telegramChannelAHref} and enjoy access to ${insiderFeaturesAHref} and the latest beta versions, several months ahead of public release.`;
-const telegramChatLink = "<a href='https://t.me/tribute/app?startapp=sfFf'>chat</a>";
-const telegramChatIntroduction = `Join the plugin's ${telegramChatLink} - your space to seek advice, ask questions, and share knowledge (access via the tribute bot).`;
-const donation = `If you appreciate this plugin and would like to support its continued development, please consider donating through the buttons below or via Telegram Stars in the ${telegramChannelAHref}!`;
-const bestRegards = "Best regards,\nYour soberhacker🍃🧘💻\n⌞";
-
-export const privacyPolicyLink = "https://github.com/soberhacker/obsidian-telegram-sync/blob/main/PRIVACY-POLICY.md";
-
-export const notes = `
-<u><b>Telegram Sync ${releaseVersion}</b></u>\n
-🆕 ${newFeatures}\n
-💡 ${telegramChannelIntroduction}\n
-💬 ${telegramChatIntroduction}\n
-🦄 ${donation}\n
-${bestRegards}`;
+export const notes = `<u><b>Telegram Sync ${releaseVersion}</b></u>\n\n${newFeatures}`;
 
 export function showBreakingChangesInReleaseNotes() {
 	showBreakingChanges = true;
-}
-
-export function versionALessThanVersionB(versionA, versionB) {
-	if (!versionA || !versionB) return undefined;
-	return compareVersions(versionA, versionB) == -1;
 }

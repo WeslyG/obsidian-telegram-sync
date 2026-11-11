@@ -15,10 +15,10 @@ I take security seriously. If you discover a security vulnerability within my pr
 
 Please do the following:
 
-1. Email me at sober.guruhacker@gmail.com with the subject "Vulnerability Report: [short description of the issue]"
+1. Use [private vulnerability reporting](https://github.com/WeslyG/obsidian-telegram-sync/security/advisories/new) if available. Otherwise, contact the fork maintainer privately before sharing details.
 2. Provide a detailed description of the vulnerability, including steps to reproduce it and any relevant technical information (e.g., exploit code, screenshots)
 3. Allow us reasonable time to investigate and address the vulnerability before disclosing it publicly
 
-I will do my best to acknowledge receipt of your vulnerability report within 1 week and to provide regular updates about our progress. If you're curious about the status of your report, feel free to email me again. Please do not contact contributors or submit a public issue about the vulnerability.
+Follow up in the private report for status updates. Please keep vulnerability details out of public issues.
 
 I appreciate your help in keeping my project and users safe!

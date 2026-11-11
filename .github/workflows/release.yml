@@ -1,22 +1,30 @@
 name: Release
 
 on:
-    push:
-        tags: ["[0-9]*.[0-9]*.[0-9]*"]
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "Existing version tag pointing to the selected main commit (without v)"
+                required: true
+                type: string
 
 permissions:
     contents: read
 
 concurrency:
-    group: release-${{ github.ref }}
+    group: release-main
 
 jobs:
     build:
+        if: github.ref == 'refs/heads/main' && inputs.version != ''
         uses: ./.github/workflows/ci.yml
+        with:
+            release_tag: ${{ inputs.version }}
 
     publish:
         name: Publish Obsidian plugin
         needs: build
+        if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         timeout-minutes: 5
         permissions:
@@ -28,8 +36,15 @@ jobs:
             - name: Create GitHub release
               env:
                   GH_TOKEN: ${{ github.token }}
+                  RELEASE_TAG: ${{ inputs.version }}
+                  GIT_TERMINAL_PROMPT: "0"
               run: |
-                  status=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+                  set -o pipefail
+                  tag_commit=$(git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+                    ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}" \
+                    | awk '$2 ~ /\^\{\}$/ { peeled=$1 } { oid=$1 } END { print peeled ? peeled : oid }')
+                  test "$tag_commit" = "$GITHUB_SHA"
+                  status=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
                     --json isDraft,assets --jq '
                       if .isDraft then "draft"
                       elif ([.assets[].name | select(. == "main.js" or . == "manifest.json" or . == "styles.css")] | unique | length) == 3 then "published"
@@ -37,13 +52,13 @@ jobs:
                       end' 2>/dev/null) || status=missing
                   case "$status" in
                     draft)
-                      gh release upload "$GITHUB_REF_NAME" main.js manifest.json styles.css --repo "$GITHUB_REPOSITORY" --clobber
-                      gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+                      gh release upload "$RELEASE_TAG" main.js manifest.json styles.css --repo "$GITHUB_REPOSITORY" --clobber
+                      gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
                       ;;
                     published) echo "Release already published with all plugin files." ;;
                     incomplete) echo "Published release is missing plugin files." >&2; exit 1 ;;
                     *)
-                      gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css \
+                      gh release create "$RELEASE_TAG" main.js manifest.json styles.css \
                         --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
                       ;;
                   esac

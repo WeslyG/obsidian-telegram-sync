@@ -1,22 +1,15 @@
 import TelegramSyncPlugin from "src/main";
-import { App, ButtonComponent, Notice, PluginSettingTab, Setting, TextComponent } from "obsidian";
+import { App, ButtonComponent, PluginSettingTab, Setting, TextComponent } from "obsidian";
 import TelegramBot from "node-telegram-bot-api";
 import { createProgressBar, updateProgressBar, deleteProgressBar, ProgressBarType } from "src/telegram/bot/progressBar";
 import * as Client from "src/telegram/user/client";
 import { BotSettingsModal } from "./modals/BotSettings";
 import { BotProxySettingsModal } from "./modals/BotProxySettings";
 import { UserLogInModal } from "./modals/UserLogin";
-import {
-	releaseVersion,
-	versionALessThanVersionB,
-	telegramChannelLink,
-	privacyPolicyLink,
-	insiderFeaturesLink,
-} from "release-notes.mjs";
-import { _15sec, _1sec, _5sec, displayAndLog, _day } from "src/utils/logUtils";
+import { privacyPolicyLink, proxyGuideLink, releaseVersion, repositoryUrl } from "release-notes.mjs";
+import { _15sec, _1sec, displayAndLog } from "src/utils/logUtils";
 import { getTopicId } from "src/telegram/bot/message/getters";
 import * as User from "../telegram/user/user";
-import { replaceMainJs } from "src/utils/fsUtils";
 import { KeysOfConnectionStatusIndicatorType } from "src/ConnectionStatusIndicator";
 import { enqueue } from "src/utils/queues";
 import {
@@ -59,7 +52,6 @@ export interface TelegramSyncSettings {
 	pluginVersion: string;
 	telegramSessionType: Client.SessionType;
 	telegramSessionId: number;
-	betaVersion: string;
 	connectionStatusIndicatorType: KeysOfConnectionStatusIndicatorType;
 	cacheCleanupAtStartup: boolean;
 	messageDistributionRules: MessageDistributionRule[];
@@ -85,7 +77,6 @@ export const DEFAULT_SETTINGS: TelegramSyncSettings = {
 	pluginVersion: "",
 	telegramSessionType: "bot",
 	telegramSessionId: Client.getNewSessionId(),
-	betaVersion: "",
 	connectionStatusIndicatorType: "CONSTANT",
 	cacheCleanupAtStartup: false,
 	messageDistributionRules: [createDefaultMessageDistributionRule()],
@@ -103,14 +94,12 @@ export const DEFAULT_SETTINGS: TelegramSyncSettings = {
 
 export class TelegramSyncSettingTab extends PluginSettingTab {
 	plugin: TelegramSyncPlugin;
-	subscribedOnInsiderChannel: boolean;
 	refreshValues: RefreshValues;
 	refreshIntervalId?: ReturnType<typeof setInterval>;
 
 	constructor(app: App, plugin: TelegramSyncPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
-		this.subscribedOnInsiderChannel = false;
 	}
 
 	async refresh() {
@@ -152,23 +141,21 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		this.addSettingsHeader();
 
 		await this.addBot();
-		new Setting(this.containerEl)
+		const proxySettings = new Setting(this.containerEl)
 			.setName("Bot proxy")
-			.setDesc("Connect the Telegram bot through an HTTP or SOCKS5 proxy.")
+			.setDesc("Connect the Telegram bot through an HTTP, HTTPS, or SOCKS5 proxy. ")
 			.addButton((button) =>
 				button.setButtonText("Configure").onClick(() => new BotProxySettingsModal(this.plugin).open()),
 			);
+		proxySettings.descEl.createEl("a", { href: proxyGuideLink, text: "Setup guide" });
 		await this.addUser();
 		this.addAdvancedSettings();
 
 		new Setting(this.containerEl).setName("Message distribution rules").setHeading();
 		await this.addMessageDistributionRules();
 
-		new Setting(this.containerEl).setName("Insider features").setHeading();
-		this.subscribedOnInsiderChannel = await Client.subscribedOnInsiderChannel();
+		new Setting(this.containerEl).setName("Telegram user features").setHeading();
 		await this.addProcessOldMessages();
-		await this.addBetaRelease();
-		this.addTelegramChannel();
 		await this.setRefreshInterval();
 	}
 
@@ -182,11 +169,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		versionContainer.style.display = "flex";
 		versionContainer.style.justifyContent = "space-between";
 		versionContainer.createSpan().createEl("h1", {
-			text: `Telegram Sync ${
-				versionALessThanVersionB(this.plugin.manifest.version, this.plugin.settings.betaVersion)
-					? this.plugin.settings.betaVersion
-					: releaseVersion
-			}`,
+			text: `Telegram Sync ${releaseVersion}`,
 		});
 
 		const privacyPolicyButton = versionContainer.createSpan().createEl("a", {
@@ -197,9 +180,9 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		privacyPolicyButton.style.color = "LightCoral";
 		privacyPolicyButton.style.textDecoration = "None";
 
-		this.containerEl.createEl("div", { text: "Created by " }).createEl("a", {
-			text: "soberhacker🍃🧘💻",
-			href: "https://github.com/soberhacker",
+		this.containerEl.createEl("div", { text: "Fork maintained by " }).createEl("a", {
+			text: "WeslyG",
+			href: repositoryUrl,
 		});
 
 		this.containerEl.createEl("br");
@@ -302,7 +285,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 
 		// add link to authorized user features
 		userSettings.descEl.createEl("a", {
-			href: "https://github.com/soberhacker/obsidian-telegram-sync/blob/main/docs/Authorized%20User%20Features.md",
+			href: `${repositoryUrl}/blob/main/docs/Authorized%20User%20Features.md`,
 			text: "a few secondary features",
 		});
 	}
@@ -390,59 +373,8 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		});
 	}
 
-	async addBetaRelease() {
-		const disabled = !this.plugin.userConnected || !this.subscribedOnInsiderChannel;
-
-		const installed = "Installed\n\nRestart the plugin or Obsidian to apply the changes";
-
-		new Setting(this.containerEl)
-			.setName("Beta release")
-			.setDesc(
-				"Install the latest beta release to be among the first to try out new features. It will launch during the plugin's next load",
-			)
-			.addButton(async (btn) => {
-				btn.setDisabled(disabled);
-				btn.setTooltip("Install Beta Release");
-				btn.setWarning();
-				btn.setIcon("install");
-				btn.onClick(async () => {
-					const notice = new Notice("Downloading...", _day);
-					try {
-						const betaRelease = await Client.getLastBetaRelease(this.plugin.manifest.version);
-						notice.setMessage(`Installing...`);
-						await replaceMainJs(this.app.vault, betaRelease.mainJs);
-						this.plugin.settings.betaVersion = betaRelease.betaVersion;
-						await this.plugin.saveSettings();
-						notice.setMessage(installed);
-					} catch (e) {
-						notice.setMessage(e);
-					}
-				});
-			})
-			.addButton(async (btn) => {
-				btn.setTooltip("Return to production release");
-				btn.setIcon("undo-glyph");
-				btn.setDisabled(disabled);
-				btn.onClick(async () => {
-					if (!this.plugin.settings.betaVersion) {
-						new Notice(`You already have the production version of the plugin installed`, _5sec);
-						return;
-					}
-					const notice = new Notice("Installing...", _day);
-					try {
-						await replaceMainJs(this.app.vault, "main-prod.js");
-						this.plugin.settings.betaVersion = "";
-						await this.plugin.saveSettings();
-						notice.setMessage(installed);
-					} catch (e) {
-						notice.setMessage("Error during return to production release: " + e);
-					}
-				});
-			});
-	}
-
 	async addProcessOldMessages() {
-		const disabled = !this.plugin.userConnected || !this.subscribedOnInsiderChannel;
+		const disabled = !this.plugin.userConnected;
 
 		new Setting(this.containerEl)
 			.setName("Process old messages")
@@ -469,33 +401,6 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				});
 			});
-	}
-
-	addTelegramChannel() {
-		const telegramChannelSetting = new Setting(this.containerEl)
-			.setName("Telegram Sync Insider channel")
-			.setDesc(
-				"By connecting your user to the plugin and subscribing to our Telegram channel, you'll get access to the latest beta versions, several months ahead of public release, and unlock for free ",
-			)
-			.addButton((btn: ButtonComponent) => {
-				if (this.subscribedOnInsiderChannel) btn.setButtonText("Open");
-				else {
-					btn.setButtonText("Unlock Features for Free");
-					btn.setClass("mod-cta");
-				}
-				btn.onClick(async () => {
-					if (!this.subscribedOnInsiderChannel)
-						displayAndLog(
-							this.plugin,
-							"After channel subscription, connect your Telegram user (if not done) and refresh the plugin settings for insider features",
-						);
-					window.open(telegramChannelLink, "_blank");
-				});
-			});
-		telegramChannelSetting.descEl.createEl("a", {
-			href: insiderFeaturesLink,
-			text: "all insider features",
-		});
 	}
 
 	async storeTopicName(msg: TelegramBot.Message) {

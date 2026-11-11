@@ -6,6 +6,10 @@ on:
     push:
         branches: ["**"]
     workflow_call:
+        inputs:
+            release_tag:
+                type: string
+                default: ""
 
 permissions:
     contents: read
@@ -18,7 +22,7 @@ jobs:
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
-                  fetch-depth: ${{ github.ref_type == 'tag' && '0' || '1' }}
+                  fetch-depth: ${{ inputs.release_tag != '' && '0' || '1' }}
                   persist-credentials: false
             - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
               with:
@@ -26,12 +30,17 @@ jobs:
                   cache: npm
             - run: npm ci
             - name: Verify release tag
-              if: github.ref_type == 'tag'
+              if: inputs.release_tag != ''
+              env:
+                  RELEASE_TAG: ${{ inputs.release_tag }}
               run: |
-                  git merge-base --is-ancestor HEAD refs/remotes/origin/main
-                  npm run release-notes-check -- "$GITHUB_REF_NAME"
+                  test "$GITHUB_REF" = refs/heads/main
+                  npm run release-notes-check -- "$RELEASE_TAG"
+                  tag_commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+                  test "$tag_commit" = "$GITHUB_SHA"
             - run: npm run build
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+              if: github.ref == 'refs/heads/main'
               with:
                   name: telegram-sync
                   path: |

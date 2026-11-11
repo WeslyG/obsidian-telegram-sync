@@ -45,7 +45,7 @@ export class MessageDistributionRulesModal extends Modal {
 		this.titleEl.setText(`${this.editing ? "Editing" : "Adding"} message distribution rule`);
 		new Setting(this.messageDistributionRulesDiv).descEl.createEl("a", {
 			text: "🗎 User guide",
-			href: "https://github.com/soberhacker/obsidian-telegram-sync/blob/main/docs/Template%20Variables%20List.md",
+			href: "https://github.com/WeslyG/obsidian-telegram-sync/blob/main/docs/Template%20Variables%20List.md",
 		});
 	}
 
@@ -62,7 +62,7 @@ export class MessageDistributionRulesModal extends Modal {
 						this.messageDistributionRule.messageFilterConditions =
 							extractConditionsFromFilterQuery(filterQuery);
 					})
-					.setPlaceholder("example: {{topic=Notes}}{{user=soberhacker}}");
+					.setPlaceholder("example: {{topic=Notes}}{{user=example_user}}");
 			});
 		setSettingStyles(setting);
 	}

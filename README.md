@@ -1,18 +1,12 @@
 # Telegram Sync for Obsidian
 
-<a href="https://github.com/soberhacker/obsidian-telegram-sync/releases/latest">
-<img src="https://img.shields.io/github/v/release/soberhacker/obsidian-telegram-sync?label=plugin&display_name=tag&logo=obsidian&color=purple&logoColor=violet">
-</a>&nbsp;<a href="https://github.com/soberhacker/obsidian-telegram-sync">
-<img src="https://img.shields.io/github/downloads/soberhacker/obsidian-telegram-sync/total?logo=github">
-</a>&nbsp;<a href="https://t.me/obsidian_telegram_sync">
-<img src="https://img.shields.io/badge/Telegram-Channel-blue.svg?logo=telegram">
-</a>&nbsp;<a href="https://t.me/tribute/app?startapp=sfFf">
-<img src="https://img.shields.io/badge/Telegram-Support-red.svg?logo=telegram&logoColor=f5f5f5&color=red">
+<a href="https://github.com/WeslyG/obsidian-telegram-sync/releases/latest">
+<img src="https://img.shields.io/github/v/release/WeslyG/obsidian-telegram-sync?label=plugin&display_name=tag&logo=obsidian&color=purple&logoColor=violet">
+</a>&nbsp;<a href="https://github.com/WeslyG/obsidian-telegram-sync">
+<img src="https://img.shields.io/github/downloads/WeslyG/obsidian-telegram-sync/total?logo=github">
 </a><br><br>
 
-Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsidian](https://obsidian.md/plugins?id=telegram-sync) vault. You can easily save text, voice transcripts, images, and other files from your Telegram chats to Obsidian for further processing and organization. This plugin is only available for desktops and would never be available on mobile platforms.
-
-<img width="469" alt="image" src="https://github.com/soberhacker/obsidian-telegram-sync/assets/128756825/65f84775-8cb4-4a45-811b-296b87e2b52d"> <img width="438" alt="image" src="https://github.com/soberhacker/obsidian-telegram-sync/assets/128756825/e50c6e5a-b9d6-4995-8538-d4095d6966f2">
+Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsidian](https://obsidian.md/) vault. You can save text, voice transcripts, images, and other files from your Telegram chats to Obsidian for further processing and organization. The plugin is available for desktop Obsidian. This fork is maintained by [WeslyG](https://github.com/WeslyG/obsidian-telegram-sync).
 
 ---
 
@@ -20,9 +14,8 @@ Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsi
 
 -   [Features](#-features)
 -   [Installation](#-installation)
--   [Manual Installation](#-manual-installation)
 -   [Usage](#-usage)
--   [Supporters & Donations](#-supporters--donations)
+-   [Bot proxy](#bot-proxy)
 -   [Contributing](#-contributing)
 
 ## 🚀 Features
@@ -34,17 +27,11 @@ Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsi
 -   Set folders for new notes and files
 -   Automatically format text messages with markdown
 -   Delete processed messages from Telegram
+-   Connect the Telegram bot through HTTP, HTTPS, or SOCKS5 with optional authentication
 
 ## 📦 Installation
 
-1. Click on [Telegram Sync](https://obsidian.md/plugins?id=telegram-sync) link
-2. Allow to open Obsidian app
-3. Make sure that community plugins is turned on
-4. Click the Install button, then enable the plugin by toggling the switch
-
-## 👏 Manual Installation
-
-1. Download `main.js`, `styles.css`, and `manifest.json` from the [fork's releases](https://github.com/WeslyG/obsidian-telegram-sync/releases), or from a successful [CI run](https://github.com/WeslyG/obsidian-telegram-sync/actions/workflows/ci.yml) for a development build.
+1. Download `main.js`, `styles.css`, and `manifest.json` from [GitHub Releases](https://github.com/WeslyG/obsidian-telegram-sync/releases).
 2. Copy the downloaded files to <path-to-your-vault>/.obsidian/plugins/telegram-sync/
 3. Restart Obsidian and enable **Telegram Sync** in the Community plugins tab
 
@@ -61,34 +48,7 @@ Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsi
 
 ### Bot proxy
 
-Open **Settings → Telegram Sync → Bot proxy → Configure**. In **Connection**, choose HTTP, HTTPS, or SOCKS5 and enter the proxy host and port. If the proxy requires credentials, turn on **Use proxy authentication** in **Authentication**, enter the username and password, and click **Save**. Authentication uses Obsidian's local secret storage and requires Obsidian 1.11.4 or later.
-
-This setting applies to Telegram Bot API requests, including polling and file downloads.
-
-## 💁 Supporters & Donations
-
-Big thanks to everyone who's already been supporting this project - you rock!
-
-\- maauso - knopki - Fabio Scarsi - Volodymyr Tymoshchuk - Lina - Maks Rososhynskyi - anonymous patrons
-
----
-
-<div align="center">
-If you like this plugin and are considering donating 🌠 to support continued development, use the buttons below.<br><br>
-
-<a href="https://nowpayments.io/donation?api_key=JMM7NE1-M4X4JY6-N8EK1GJ-H8XQXFK">
-<img src="https://img.buymeacoffee.com/button-api/?text=Cryptocurrency&emoji=%F0%9F%9A%80&slug=soberhacker&button_colour=e38215&font_colour=FFFFFF&font_family=Bree&outline_colour=000000&coffee_colour=FFDD00" width=235 height=91>
-</a>&nbsp;&nbsp;<a href="https://www.buymeacoffee.com/soberhacker">
-<img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=soberhacker&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFFFFF"  width=235 height=91>
-</a><br>
-<a href="https://ko-fi.com/soberhacker">
-<img src="https://storage.ko-fi.com/cdn/brandasset/logo_white_stroke.png?" width=140 height=40>
-</a>&nbsp;&nbsp;<a href="https://www.paypal.com/donate/?hosted_button_id=VYSCUZX8MYGCU">
-<img src="https://www.paypalobjects.com/digitalassets/c/website/logo/full-text/pp_fc_hl.svg" width=140 height=40>
-</a>
-</div>
-
----
+Open **Settings → Telegram Sync → Bot proxy → Configure**. Choose a protocol in **Connection** and enter the host and port. Use **Authentication** to turn username and password on or off. See the [bot proxy setup guide](./docs/Bot%20Proxy.md) for examples and troubleshooting.
 
 ## 💻 Contributing
 
@@ -96,7 +56,7 @@ If you're thinking about contributing, please check out the [Contributing Guide]
 <br>
 
 <div align="center">
-<a href="https://github.com/soberhacker/obsidian-telegram-sync/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=soberhacker/obsidian-telegram-sync" />
+<a href="https://github.com/WeslyG/obsidian-telegram-sync/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=WeslyG/obsidian-telegram-sync" />
 </a>
 </div>
