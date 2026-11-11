@@ -77,7 +77,7 @@ export const DEFAULT_SETTINGS: TelegramSyncSettings = {
 
 export class TelegramSyncSettingTab extends PluginSettingTab {
 	plugin: TelegramSyncPlugin;
-	refreshValues: RefreshValues;
+	refreshValues?: RefreshValues;
 	refreshIntervalId?: ReturnType<typeof setInterval>;
 
 	constructor(app: App, plugin: TelegramSyncPlugin) {
@@ -100,14 +100,15 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			userSessionSaved !== this.refreshValues.userSessionSaved
 		) {
 			try {
-				if (!this.refreshValues) this.refreshValues = {};
-				else await this.display();
+				if (this.refreshValues) await this.display();
 			} finally {
-				this.refreshValues.botConnected = botConnected;
-				this.refreshValues.userConnected = userConnected;
-				this.refreshValues.checkingBotConnection = checkingBotConnection;
-				this.refreshValues.checkingUserConnection = checkingUserConnection;
-				this.refreshValues.userSessionSaved = userSessionSaved;
+				this.refreshValues = {
+					botConnected,
+					userConnected,
+					checkingBotConnection,
+					checkingUserConnection,
+					userSessionSaved,
+				};
 			}
 		}
 	}

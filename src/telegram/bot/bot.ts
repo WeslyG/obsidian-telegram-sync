@@ -30,7 +30,10 @@ export async function connect(plugin: TelegramSyncPlugin) {
 		void poll(plugin, bot);
 	} catch (error) {
 		disconnect(plugin);
-		await plugin.setBotStatus("disconnected", error);
+		await plugin.setBotStatus(
+			"disconnected",
+			error instanceof Error ? error : new Error("Telegram Bot API connection failed."),
+		);
 	} finally {
 		plugin.checkingBotConnection = false;
 	}
@@ -72,7 +75,10 @@ async function poll(plugin: TelegramSyncPlugin, bot: TelegramBot) {
 			}
 		} catch (error) {
 			if (plugin.bot !== bot) return;
-			await plugin.setBotStatus("disconnected", error);
+			await plugin.setBotStatus(
+				"disconnected",
+				error instanceof Error ? error : new Error("Telegram Bot API connection failed."),
+			);
 			const retry = error instanceof BotApiError ? error.retryAfter : undefined;
 			const seconds = Math.max(3, Math.min(retry ?? 15, 300));
 			await delay(seconds * _1sec, undefined, { signal: bot.signal }).catch(() => undefined);

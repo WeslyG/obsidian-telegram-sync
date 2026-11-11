@@ -12,7 +12,6 @@ import { _15sec, displayAndLog } from "../../utils/logUtils";
 
 export class MessageDistributionRulesModal extends Modal {
 	messageDistributionRule: MessageDistributionRule;
-	messageDistributionRulesDiv: HTMLDivElement;
 	plugin: TelegramSyncPlugin;
 	saved = false;
 	editing = false;
@@ -26,31 +25,31 @@ export class MessageDistributionRulesModal extends Modal {
 		} else this.messageDistributionRule = createBlankMessageDistributionRule();
 	}
 
-	async display() {
+	onOpen() {
 		this.modalEl.style.height = "90vh";
 		this.modalEl.style.width = "60vw";
-		this.addHeader();
-		this.addMessageFilter();
-		this.addTemplateFilePath();
-		this.addNotePathTemplate();
-		this.addFilePathTemplate();
-		this.addHeading();
-		this.addMessageSortingMode();
-		this.addFooterButtons();
+		this.contentEl.empty();
+		const container = this.contentEl.createDiv();
+		this.addHeader(container);
+		this.addMessageFilter(container);
+		this.addTemplateFilePath(container);
+		this.addNotePathTemplate(container);
+		this.addFilePathTemplate(container);
+		this.addHeading(container);
+		this.addMessageSortingMode(container);
+		this.addFooterButtons(container);
 	}
 
-	addHeader() {
-		this.contentEl.empty();
-		this.messageDistributionRulesDiv = this.contentEl.createDiv();
+	private addHeader(container: HTMLDivElement) {
 		this.titleEl.setText(`${this.editing ? "Editing" : "Adding"} message distribution rule`);
-		new Setting(this.messageDistributionRulesDiv).descEl.createEl("a", {
+		new Setting(container).descEl.createEl("a", {
 			text: "🗎 User guide",
 			href: "https://github.com/WeslyG/obsidian-telegram-sync/blob/main/docs/Template%20Variables%20List.md",
 		});
 	}
 
-	addMessageFilter() {
-		const setting = new Setting(this.messageDistributionRulesDiv)
+	private addMessageFilter(container: HTMLDivElement) {
+		const setting = new Setting(container)
 			.setName("Message filter")
 			.setDesc(
 				"Conditions by which you would like to filter messages. Leave the field blank if you want to apply this rule to all messages",
@@ -67,8 +66,8 @@ export class MessageDistributionRulesModal extends Modal {
 		setSettingStyles(setting);
 	}
 
-	addTemplateFilePath() {
-		const setting = new Setting(this.messageDistributionRulesDiv)
+	private addTemplateFilePath(container: HTMLDivElement) {
+		const setting = new Setting(container)
 			.setName("Template file path")
 			.setDesc("Specify path to template file you want to apply to new notes")
 			.addSearch((cb) => {
@@ -82,8 +81,8 @@ export class MessageDistributionRulesModal extends Modal {
 		setSettingStyles(setting);
 	}
 
-	addNotePathTemplate() {
-		const setting = new Setting(this.messageDistributionRulesDiv)
+	private addNotePathTemplate(container: HTMLDivElement) {
+		const setting = new Setting(container)
 			.setName("Note path template")
 			.setDesc(
 				"Specify path template for storage folders and note names. Leave empty if you don't want to create any notes from filtrated messages",
@@ -98,8 +97,8 @@ export class MessageDistributionRulesModal extends Modal {
 		setSettingStyles(setting);
 	}
 
-	addFilePathTemplate() {
-		const setting = new Setting(this.messageDistributionRulesDiv);
+	private addFilePathTemplate(container: HTMLDivElement) {
+		const setting = new Setting(container);
 		setting
 			.setName("File path template")
 			.setDesc(
@@ -115,8 +114,8 @@ export class MessageDistributionRulesModal extends Modal {
 		setSettingStyles(setting);
 	}
 
-	addHeading() {
-		const setting = new Setting(this.messageDistributionRulesDiv);
+	private addHeading(container: HTMLDivElement) {
+		const setting = new Setting(container);
 		setting
 			.setName("Heading")
 			.setDesc("Specify the heading under which new messages will be inserted")
@@ -130,8 +129,8 @@ export class MessageDistributionRulesModal extends Modal {
 		setSettingStyles(setting);
 	}
 
-	addMessageSortingMode() {
-		const setting = new Setting(this.messageDistributionRulesDiv);
+	private addMessageSortingMode(container: HTMLDivElement) {
+		const setting = new Setting(container);
 		setting
 			.setName("Reversed order")
 			.setDesc(
@@ -145,8 +144,8 @@ export class MessageDistributionRulesModal extends Modal {
 			});
 	}
 
-	addFooterButtons() {
-		this.messageDistributionRulesDiv.createEl("br");
+	private addFooterButtons(container: HTMLDivElement) {
+		container.createEl("br");
 		const footerButtons = new Setting(this.contentEl.createDiv());
 		footerButtons.addButton((b) => {
 			b.setTooltip("Submit")
@@ -187,9 +186,6 @@ export class MessageDistributionRulesModal extends Modal {
 				});
 			return b;
 		});
-	}
-	onOpen() {
-		this.display();
 	}
 }
 function setSettingStyles(setting: Setting) {

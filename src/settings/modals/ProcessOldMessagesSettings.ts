@@ -3,27 +3,19 @@ import TelegramSyncPlugin from "src/main";
 import { getChatsForSearch } from "src/telegram/user/sync";
 
 export class ProcessOldMessagesSettingsModal extends Modal {
-	processOldMessagesSettingsDiv: HTMLDivElement;
 	saved = false;
 	constructor(public plugin: TelegramSyncPlugin) {
 		super(plugin.app);
 	}
 
-	async display() {
-		this.addHeader();
-		await this.addChatsForSearch();
-	}
-
-	addHeader() {
+	private display() {
 		this.contentEl.empty();
-		this.processOldMessagesSettingsDiv = this.contentEl.createDiv();
+		const container = this.contentEl.createDiv();
 		this.titleEl.setText("Processing old messages settings");
-	}
 
-	async addChatsForSearch() {
-		new Setting(this.processOldMessagesSettingsDiv).setName("Chats for message search").setHeading();
+		new Setting(container).setName("Chats for message search").setHeading();
 		this.plugin.settings.processOldMessagesSettings.chatsForSearch.forEach((chat) => {
-			const setting = new Setting(this.processOldMessagesSettingsDiv);
+			const setting = new Setting(container);
 			setting.setName(`"${chat.name}"`);
 			setting.addExtraButton((btn) => {
 				btn.setIcon("trash-2")
@@ -35,7 +27,7 @@ export class ProcessOldMessagesSettingsModal extends Modal {
 					});
 			});
 		});
-		new Setting(this.processOldMessagesSettingsDiv)
+		new Setting(container)
 			.setDesc(
 				"Choose chats with your connected bot in which to search for old messages. Only chats with activity in the last 30 days will be available. If no chat is chosen, old message processing will not occur",
 			)

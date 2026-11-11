@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.0.0 (2026-11-11)
+
+- Add HTTP, HTTPS, and SOCKS5 support for the Bot API, with proxy authentication configured separately.
+- Store bot tokens and proxy credentials in Obsidian secret storage. Re-enter legacy encrypted bot tokens.
+- Require Obsidian 1.11.4 or later. An empty chat allowlist now blocks imports.
+- Replace the legacy Bot API transport and migrate optional Telegram account features to Teleproto.
+- Verify dependency integrity and signatures in CI, and enable strict TypeScript checks.
+
 ## 4.0.0 (2024-10-30)
 
 

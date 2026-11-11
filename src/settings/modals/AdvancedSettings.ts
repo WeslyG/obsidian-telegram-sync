@@ -8,29 +8,24 @@ import {
 } from "src/ConnectionStatusIndicator";
 
 export class AdvancedSettingsModal extends Modal {
-	advancedSettingsDiv: HTMLDivElement;
 	saved = false;
 	constructor(public plugin: TelegramSyncPlugin) {
 		super(plugin.app);
 	}
 
-	async display() {
-		this.addHeader();
-
-		this.addConnectionStatusIndicator();
-		this.addDeleteMessagesFromTelegram();
-		this.addMessageDelimiterSetting();
-		this.addParallelMessageProcessing();
-	}
-
-	addHeader() {
+	onOpen() {
 		this.contentEl.empty();
-		this.advancedSettingsDiv = this.contentEl.createDiv();
+		const container = this.contentEl.createDiv();
 		this.titleEl.setText("Advanced settings");
+
+		this.addConnectionStatusIndicator(container);
+		this.addDeleteMessagesFromTelegram(container);
+		this.addMessageDelimiterSetting(container);
+		this.addParallelMessageProcessing(container);
 	}
 
-	addMessageDelimiterSetting() {
-		new Setting(this.advancedSettingsDiv)
+	private addMessageDelimiterSetting(container: HTMLDivElement) {
+		new Setting(container)
 			.setName(`Default delimiter "***" between messages`)
 			.setDesc("Turn off for using a custom delimiter, which you can set in the template file")
 			.addToggle((toggle) => {
@@ -42,8 +37,8 @@ export class AdvancedSettingsModal extends Modal {
 			});
 	}
 
-	addParallelMessageProcessing() {
-		new Setting(this.advancedSettingsDiv)
+	private addParallelMessageProcessing(container: HTMLDivElement) {
+		new Setting(container)
 			.setName(`Parallel message processing`)
 			.setDesc("Turn on for faster message and file processing. Caution: may disrupt message order")
 			.addToggle((toggle) => {
@@ -55,8 +50,8 @@ export class AdvancedSettingsModal extends Modal {
 			});
 	}
 
-	addConnectionStatusIndicator() {
-		new Setting(this.advancedSettingsDiv)
+	private addConnectionStatusIndicator(container: HTMLDivElement) {
+		new Setting(container)
 			.setName(connectionStatusIndicatorSettingName)
 			.setDesc("Choose when you want to see the connection status indicator")
 			.addDropdown((dropDown) => {
@@ -70,8 +65,8 @@ export class AdvancedSettingsModal extends Modal {
 			});
 	}
 
-	addDeleteMessagesFromTelegram() {
-		new Setting(this.advancedSettingsDiv)
+	private addDeleteMessagesFromTelegram(container: HTMLDivElement) {
+		new Setting(container)
 			.setName("Delete messages from Telegram")
 			.setDesc(
 				"The Telegram messages will be deleted after processing them. If disabled, the Telegram messages will be marked as processed",
@@ -83,9 +78,5 @@ export class AdvancedSettingsModal extends Modal {
 					await this.plugin.saveSettings();
 				});
 			});
-	}
-
-	onOpen() {
-		this.display();
 	}
 }
