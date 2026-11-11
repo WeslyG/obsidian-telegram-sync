@@ -20,7 +20,7 @@ The maintainers do not receive Telegram messages, files, or credentials from the
 
 #### Data Transfer and Storage
 
-When you configure a [bot proxy](./docs/Bot%20Proxy.md), Bot API traffic travels through that proxy. The proxy can see connection metadata and receives proxy credentials when authentication is enabled. Obsidian stores those credentials locally in its secret storage. The optional Telegram user session uses a separate connection.
+When you configure a [bot proxy](./docs/Bot%20Proxy.md), Bot API traffic travels through that proxy. The proxy can see connection metadata and receives proxy credentials when authentication is enabled. Bot tokens, proxy credentials, and optional user session credentials are kept in Obsidian's local secret storage. The optional Telegram user session uses a separate direct connection. Old-message recovery, if enabled, forwards messages within the selected Telegram chats.
 
 ---
 

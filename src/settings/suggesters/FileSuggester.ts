@@ -1,34 +1,18 @@
 // Credits go to Liam's Periodic Notes Plugin: https://github.com/liamcain/obsidian-periodic-notes
+import { AbstractInputSuggest, TFile } from "obsidian";
+import type TelegramSyncPlugin from "src/main";
 
-import { TAbstractFile, TFile } from "obsidian";
-import { TextInputSuggest } from "./suggest";
-import TelegramSyncPlugin from "src/main";
-
-export class FileSuggest extends TextInputSuggest<TFile> {
+export class FileSuggest extends AbstractInputSuggest<TFile> {
 	constructor(
 		public inputEl: HTMLInputElement,
-		public plugin: TelegramSyncPlugin,
+		private plugin: TelegramSyncPlugin,
 	) {
 		super(plugin.app, inputEl);
 	}
 
-	getSuggestions(input_str: string): TFile[] {
-		const all_files = this.plugin.app.vault.getAllLoadedFiles();
-
-		if (!all_files) {
-			return [];
-		}
-
-		const files: TFile[] = [];
-		const lower_input_str = input_str.toLowerCase();
-
-		all_files.forEach((file: TAbstractFile) => {
-			if (file instanceof TFile && file.extension === "md" && file.path.toLowerCase().contains(lower_input_str)) {
-				files.push(file);
-			}
-		});
-
-		return files;
+	getSuggestions(input: string): TFile[] {
+		const query = input.toLowerCase();
+		return this.plugin.app.vault.getMarkdownFiles().filter((file) => file.path.toLowerCase().includes(query));
 	}
 
 	renderSuggestion(file: TFile, el: HTMLElement): void {
@@ -36,8 +20,8 @@ export class FileSuggest extends TextInputSuggest<TFile> {
 	}
 
 	selectSuggestion(file: TFile): void {
-		this.inputEl.value = file.path;
-		this.inputEl.trigger("input");
+		this.setValue(file.path);
+		this.inputEl.dispatchEvent(new Event("input"));
 		this.close();
 	}
 }

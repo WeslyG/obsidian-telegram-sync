@@ -1,11 +1,13 @@
-import { Api } from "telegram";
+import type { Message } from "src/telegram/bot/apiTypes";
+import { Api } from "telegram/tl";
+import { getPeerId } from "telegram/Utils";
+import { isAllowedChat } from "../bot/access";
 import { checkUserService, clientUser } from "./client";
 import { getOffsetDate } from "src/utils/dateUtils";
 import TelegramSyncPlugin from "src/main";
 import { Dialog } from "telegram/tl/custom/dialog";
 import { _5sec, cleanErrorCache, displayAndLog, displayAndLogError, _day, errorCache } from "src/utils/logUtils";
 import { Notice } from "obsidian";
-import TelegramBot from "node-telegram-bot-api";
 import { extractMediaId } from "../convertors/botFileToMessageMedia";
 import { getFileObject } from "../bot/message/getters";
 import { findUserMsg } from "../convertors/botMessageToClientMessage";
@@ -19,6 +21,7 @@ const defaultMessagesLimit = 1000;
 const _24hours = 24 * 60 * 60;
 
 interface ForwardedMessage {
+	botChatId: number;
 	original: Api.Message;
 	forwarded: Api.Message;
 }
@@ -62,8 +65,8 @@ export async function getChatsForSearch(plugin: TelegramSyncPlugin, offsetDays: 
 	let allDialogs: Dialog[] = [];
 	try {
 		allDialogs = await checkedClient.getDialogs({ limit: plugin.settings.processOldMessagesSettings.dialogsLimit });
-	} catch (e) {
-		notice.setMessage(`Search for "${botUserName}" in chats cancelled!\nError: ${JSON.stringify(e)}`);
+	} catch {
+		notice.setMessage("Could not list Telegram chats.");
 	}
 	allDialogs = allDialogs.filter(
 		(dialog) =>
@@ -88,10 +91,8 @@ export async function getChatsForSearch(plugin: TelegramSyncPlugin, offsetDays: 
 				search: botUserName,
 			});
 		} catch (e) {
-			if (e instanceof Error && e.message.contains("CHAT_ADMIN_REQUIRED")) continue;
-			notice.setMessage(
-				`Search for ${botUserName} in ${dialogName} participants cancelled!\nError: ${JSON.stringify(e)}`,
-			);
+			if (e instanceof Error && e.message.includes("CHAT_ADMIN_REQUIRED")) continue;
+			notice.setMessage("Could not check participants in a Telegram chat.");
 		}
 		if (participants.length > 0) chatsForSearch.push({ name: dialogName, peer });
 	}
@@ -109,7 +110,7 @@ export async function getUnprocessedMessages(plugin: TelegramSyncPlugin): Promis
 		);
 		return [];
 	}
-	const { checkedClient } = await checkUserService();
+	const { checkedClient, checkedUser } = await checkUserService();
 	const oneDayAgo = getOffsetDate(1);
 	const processOldMessagesSettings = plugin.settings.processOldMessagesSettings;
 	let offsetDate = getOffsetDate(processOldMessagesSettings.daysLimit);
@@ -120,6 +121,11 @@ export async function getUnprocessedMessages(plugin: TelegramSyncPlugin): Promis
 		let messages: Api.Message[] = [];
 		try {
 			const peer = correctPeerObject(chat.peer);
+			const privateBot = peer instanceof Api.InputPeerUser && peer.userId.toString() === String(botId);
+			const chatId = privateBot ? checkedUser.id.toJSNumber() : Number(getPeerId(peer));
+			if (!Number.isSafeInteger(chatId) || (peer instanceof Api.InputPeerUser && !privateBot)) continue;
+			if (!isAllowedChat(plugin.settings.allowedChats, chatId, privateBot ? checkedUser.username : undefined))
+				continue;
 			messages = await checkedClient.getMessages(peer, {
 				limit: processOldMessagesSettings.messagesLimit,
 				reverse: true,
@@ -131,7 +137,7 @@ export async function getUnprocessedMessages(plugin: TelegramSyncPlugin): Promis
 			displayAndLogError(
 				plugin,
 				e,
-				`Search for old unprocessed messages in ${chat.name} cancelled!`,
+				"Could not search for old messages in one of the selected chats.",
 				undefined,
 				undefined,
 				0,
@@ -191,20 +197,24 @@ export async function forwardUnprocessedMessages(plugin: TelegramSyncPlugin) {
 	cleanErrorCache();
 	stopUpdatingProcessingDate();
 	const unprocessedMessages = await getUnprocessedMessages(plugin);
+	const { checkedUser } = await checkUserService();
 	clearCachedUnprocessedMessages();
 	try {
 		for (const message of unprocessedMessages) {
 			try {
+				const botChatId =
+					message.peerId instanceof Api.PeerUser ? checkedUser.id.toJSNumber() : message.chatId?.toJSNumber();
+				if (botChatId === undefined) continue;
 				if (message.forward && message.forward.chatId && !message.forward._chat)
 					message.forward._chat = await message.forward.getChat();
 				const forwardedMessage = getFirstMessage(await message.forwardTo(message.inputChat || message.peerId));
 				if (!errorCache) processOldMessagesSettings.lastProcessingDate = message.editDate || message.date;
-				cachedUnprocessedMessages.push({ original: message, forwarded: forwardedMessage });
+				cachedUnprocessedMessages.push({ botChatId, original: message, forwarded: forwardedMessage });
 			} catch (e) {
 				displayAndLogError(
 					plugin,
 					e,
-					`Forwarding message "${message.message.slice(0, 100)}..." cancelled!`,
+					"Could not forward an old message in its original chat.",
 					undefined,
 					undefined,
 					0,
@@ -216,12 +226,8 @@ export async function forwardUnprocessedMessages(plugin: TelegramSyncPlugin) {
 		if (!errorCache) {
 			processOldMessagesSettings.lastProcessingDate = nowDate;
 			canUpdateProcessingDate = true;
-		} else if (plugin.bot) {
-			const { checkedUser } = await checkUserService();
-			await plugin.bot.sendMessage(
-				checkedUser.id.toJSNumber(),
-				`❌ ERRORS DURING SEARCH OF OLD UNPROCESSED MESSAGES:\n${errorCache}`,
-			);
+		} else {
+			displayAndLog(plugin, "Some older messages could not be recovered. Check the selected chats.", _5sec);
 			cleanErrorCache();
 		}
 	} finally {
@@ -229,17 +235,18 @@ export async function forwardUnprocessedMessages(plugin: TelegramSyncPlugin) {
 	}
 }
 
-export function addOriginalUserMsg(botMsg: TelegramBot.Message) {
-	if (cachedUnprocessedMessages.length == 0) return;
+export function addOriginalUserMsg(botMsg: Message) {
+	const related = cachedUnprocessedMessages.filter((item) => item.botChatId === botMsg.chat.id);
+	if (!related.length) return;
 
 	let mediaId = "";
 	if (!botMsg.text) {
 		const { fileObject } = getFileObject(botMsg);
-		const fileObjectToUse = fileObject instanceof Array ? fileObject.pop() : fileObject;
-		mediaId = extractMediaId(fileObjectToUse.file_id);
+		const attachment = Array.isArray(fileObject) ? fileObject.at(-1) : fileObject;
+		if (attachment) mediaId = extractMediaId(attachment.file_id);
 	}
 
-	const originalMessages = cachedUnprocessedMessages.map((userMsg) => userMsg.original);
+	const originalMessages = related.map((userMsg) => userMsg.original);
 
 	const userMsg = findUserMsg(originalMessages, botMsg, mediaId);
 
@@ -249,13 +256,13 @@ export function addOriginalUserMsg(botMsg: TelegramBot.Message) {
 		return;
 	}
 
-	const forwardedMessages = cachedUnprocessedMessages.map((userMsg) => userMsg.forwarded);
+	const forwardedMessages = related.map((userMsg) => userMsg.forwarded);
 
 	const forwardedMsg = findUserMsg(forwardedMessages, botMsg, mediaId);
 
 	if (!forwardedMsg) return;
 
-	const unprocessedMessage = cachedUnprocessedMessages.find((msg) => msg.forwarded.id == forwardedMsg.id);
+	const unprocessedMessage = related.find((msg) => msg.forwarded.id == forwardedMsg.id);
 
 	if (!unprocessedMessage) return;
 	const originalMsg = unprocessedMessage.original;

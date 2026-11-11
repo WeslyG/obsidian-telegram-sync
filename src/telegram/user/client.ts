@@ -1,236 +1,148 @@
-import { Api, TelegramClient } from "telegram";
-import { StoreSession } from "telegram/sessions";
+import type TelegramBot from "src/telegram/bot/api";
+import type { Message, User } from "src/telegram/bot/apiTypes";
+import { Api } from "telegram/tl";
+import { TelegramClient } from "telegram/client/TelegramClient";
+import { StringSession } from "telegram/sessions/StringSession";
 import { releaseVersion } from "release-notes.mjs";
-import TelegramBot from "node-telegram-bot-api";
 import QRCode from "qrcode";
-import os from "os";
-import { convertBotFileToMessageMedia } from "../convertors/botFileToMessageMedia";
 import { ProgressBarType, _3MB, createProgressBar, deleteProgressBar, updateProgressBar } from "../bot/progressBar";
-import { getInputPeer, getMessage } from "../convertors/botMessageToClientMessage";
-import { formatDateTime } from "src/utils/dateUtils";
+import { clearCachedMessages, getInputPeer, getMessage } from "../convertors/botMessageToClientMessage";
 import { LogLevel, Logger } from "telegram/extensions/Logger";
-import { _1min, _5sec } from "src/utils/logUtils";
-import * as config from "./config";
+import { _5sec } from "src/utils/logUtils";
 import { PromisedWebSockets } from "telegram/extensions";
 
 export type SessionType = "bot" | "user";
 
+export interface TelegramAppCredentials {
+	apiId: number;
+	apiHash: string;
+}
+
+export const maxUserDownloadBytes = 128 * 1024 * 1024;
+
 let client: TelegramClient | undefined;
-let _botToken: string | undefined;
-let _sessionType: SessionType;
-let _sessionId: number;
 export let clientUser: Api.User | undefined;
-let _voiceTranscripts: Map<string, string> | undefined;
-let lastReconnectTime = new Date();
+let voiceTranscripts = new Map<string, string>();
 
-const NotConnected = new Error("Can't connect to the Telegram Api");
-const NotAuthorized = new Error("Not authorized");
-const NotAuthorizedAsUser = new Error("Not authorized as user. You have to connect as user");
-
-export function getNewSessionId(): number {
-	return Number(formatDateTime(new Date(), "YYYYMMDDHHmmssSSS"));
-}
-
-
-// Stop the bot polling
 export async function stop() {
+	const active = client;
+	client = undefined;
+	clientUser = undefined;
+	voiceTranscripts = new Map();
+	clearCachedMessages();
+	if (active) await active.destroy().catch(() => undefined);
+}
+
+export async function init(credentials: TelegramAppCredentials, session: string, signal?: AbortSignal) {
+	await stop();
+	signal?.throwIfAborted();
+	const sessionStore = new StringSession(session);
+	const active = new TelegramClient(sessionStore, credentials.apiId, credentials.apiHash, {
+		connectionRetries: 2,
+		deviceModel: "Obsidian Desktop",
+		systemVersion: "Desktop",
+		appVersion: releaseVersion,
+		useWSS: true,
+		networkSocket: PromisedWebSockets,
+		baseLogger: new Logger(LogLevel.NONE),
+	});
+	client = active;
 	try {
-		if (client) {
-			client.setLogLevel(LogLevel.NONE);
-			await client.destroy();
-		}
-	} catch {
-		/* empty */
-	} finally {
-		client = undefined;
-		_botToken = undefined;
-		_voiceTranscripts = undefined;
+		await active.connect();
+		signal?.throwIfAborted();
+		return sessionStore;
+	} catch (error) {
+		if (client === active) await stop();
+		throw error;
 	}
 }
 
-// init and connect to Telegram Api
-export async function init(sessionId: number, sessionType: SessionType, deviceId: string) {
-	if (!client || _sessionType !== sessionType || _sessionId !== sessionId) {
-		await stop();
-		const logger = new Logger(LogLevel.ERROR);
-		// oxlint-disable-next-line no-unused-vars
-		logger.log = (level, message, color) => {
-			console.log(`Telegram Sync => User connection error: ${message}`);
-			// TODO in 2024: add user connection status checking and setting by controlling error and info logs
-			//if (message == "Automatic reconnection failed 2 time(s)")
-		};
-		const session = new StoreSession(`${sessionType}_${sessionId}_${deviceId}`);
-		_sessionId = sessionId;
-		_sessionType = sessionType;
-		client = new TelegramClient(session, config.dIipa, config.hsaHipa, {
-			connectionRetries: 10,
-			deviceModel: os.hostname() || os.type(),
-			appVersion: releaseVersion,
-			useWSS: true,
-			networkSocket: PromisedWebSockets,
-			baseLogger: logger,
-		});
+export async function signInAsUserWithQrCode(
+	credentials: TelegramAppCredentials,
+	container: HTMLDivElement,
+	password: string,
+	signal: AbortSignal,
+) {
+	const active = client;
+	if (!active) throw new Error("Telegram user is disconnected.");
+	await active.signInUserWithQrCode(credentials, {
+		qrCode: async ({ token }) => {
+			signal.throwIfAborted();
+			const code = await QRCode.toString("tg://login?token=" + token.toString("base64"), { type: "svg" });
+			signal.throwIfAborted();
+			const svg = new DOMParser().parseFromString(code, "image/svg+xml").documentElement;
+			svg.setAttribute("width", "150");
+			svg.setAttribute("height", "150");
+			container.replaceChildren(svg);
+		},
+		password: async () => {
+			signal.throwIfAborted();
+			return password;
+		},
+		onError: async () => true,
+	});
+}
+
+export async function authorizeUser() {
+	const active = client;
+	if (!active || !(await active.checkAuthorization()) || (await active.isBot())) {
+		throw new Error("Telegram user authorization failed.");
 	}
-
-	if (!client) throw NotConnected;
-	if (!client.connected) {
-		try {
-			await client.connect();
-			const authorized = await client.checkAuthorization();
-			if (sessionType == "user" && authorized && (await client.isBot()))
-				throw new Error("Stored session conflict. Try to log in again.");
-			if (!authorized) clientUser = undefined;
-			else if (!clientUser && authorized) clientUser = (await client.getMe()) as Api.User;
-		} catch (e) {
-			if (
-				sessionType == "user" &&
-				!(e instanceof Error && e.message.includes("Could not find a matching Constructor ID"))
-			) {
-				await init(_sessionId, "bot", deviceId);
-				throw new Error(`Login as user failed. Error: ${e}`);
-			} else throw e;
-		}
-	}
+	const user = await active.getMe();
+	if (!(user instanceof Api.User) || client !== active) throw new Error("Telegram user is disconnected.");
+	clientUser = user;
 }
 
-export async function reconnect(checkInterval = true): Promise<boolean> {
-	if (!client) return false;
-	if (!client.connected && (!checkInterval || new Date().getTime() - lastReconnectTime.getTime() >= _1min)) {
-		lastReconnectTime = new Date();
-		await client.connect();
-	}
-	return client.connected || false;
-}
-
-export async function isAuthorizedAsUser(): Promise<boolean> {
-	return (client && (await client.checkAuthorization()) && !(await client.isBot())) || false;
-}
-
-export async function signInAsBot(botToken: string) {
-	if (!client) throw NotConnected;
-	if (await client.checkAuthorization()) {
-		if (!(await client.isBot())) throw new Error("Bot session is missed");
-		if (!_botToken) _botToken = botToken;
-		if (_botToken == botToken) return;
-	}
-	await client
-		.signInBot(
-			{
-				apiId: config.dIipa,
-				apiHash: config.hsaHipa,
-			},
-			{
-				botAuthToken: botToken,
-			},
-		)
-		.then(async (botUser) => {
-			_botToken = botToken;
-			clientUser = botUser as Api.User;
-			return botUser;
-		})
-		.catch((e) => {
-			_botToken = undefined;
-			clientUser = undefined;
-			throw new Error(e);
-		});
-}
-
-export async function signInAsUserWithQrCode(container: HTMLDivElement, password?: string) {
-	if (!client) throw NotConnected;
-	if ((await client.checkAuthorization()) && (await client.isBot()))
-		throw new Error("User session is missed. Try to restart the plugin or Obsidian");
-	await client
-		.signInUserWithQrCode(
-			{ apiId: config.dIipa, apiHash: config.hsaHipa },
-			{
-				qrCode: async (qrCode) => {
-					const url = "tg://login?token=" + qrCode.token.toString("base64");
-					const qrCodeSvg = await QRCode.toString(url, { type: "svg" });
-					const parser = new DOMParser();
-					const svg = parser.parseFromString(qrCodeSvg, "image/svg+xml").documentElement;
-					svg.setAttribute("width", "150");
-					svg.setAttribute("height", "150");
-					// Removes all children from `container`
-					while (container.firstChild) {
-						container.removeChild(container.firstChild);
-					}
-					container.appendChild(svg);
-				},
-				// oxlint-disable-next-line no-unused-vars
-				password: async (hint) => {
-					return password ? password : "";
-				},
-				onError: async (error) => {
-					container.setText(`Error: ${error.message}`);
-					console.log(`Telegram Sync => ${error}`);
-					return true;
-				},
-			},
-		)
-		.then((user) => {
-			clientUser = user as Api.User;
-			return clientUser;
-		})
-		.catch((e) => {
-			clientUser = undefined;
-			console.log(`Telegram Sync => ${e}`);
-		});
-}
-
-async function checkBotService(): Promise<TelegramClient> {
-	if (!client || !(await reconnect())) throw NotConnected;
-	if (!(await client.checkAuthorization())) throw NotAuthorized;
-	return client;
+export async function revokeSession() {
+	const active = client;
+	if (!active) throw new Error("Connect the Telegram user before logging out.");
+	if (await active.checkAuthorization()) await active.invoke(new Api.auth.LogOut());
+	await stop();
 }
 
 export async function checkUserService(): Promise<{ checkedClient: TelegramClient; checkedUser: Api.User }> {
-	const checkedClient = await checkBotService();
-	if ((await checkedClient.isBot()) || !clientUser) throw NotAuthorizedAsUser;
-	return { checkedClient, checkedUser: clientUser };
+	const active = client;
+	const user = clientUser;
+	if (!active || !user) throw new Error("Connect your Telegram user to use this feature.");
+	if (!active.connected) await active.connect();
+	if (client !== active) throw new Error("Telegram user is disconnected.");
+	return { checkedClient: active, checkedUser: user };
 }
 
-// download files > 20MB
 export async function downloadMedia(
 	bot: TelegramBot,
-	botMsg: TelegramBot.Message,
-	fileId: string,
+	botMsg: Message,
 	fileSize: number,
-	botUser?: TelegramBot.User,
-) {
-	const checkedClient = await checkBotService();
-
-	// user clients needs different file id
+	botUser?: User,
+): Promise<Buffer> {
+	if (!botUser || !fileSize || fileSize > maxUserDownloadBytes) throw new Error("Attachment cannot be downloaded.");
+	const { checkedClient, checkedUser } = await checkUserService();
+	const inputPeer = await getInputPeer(checkedClient, checkedUser, botUser, botMsg);
+	const message = await getMessage(checkedClient, inputPeer, botMsg);
+	const progress =
+		fileSize > _3MB
+			? await createProgressBar(bot, botMsg, ProgressBarType.DOWNLOADING).catch(() => undefined)
+			: undefined;
 	let stage = 0;
-	let message: Api.Message | undefined = undefined;
-	if (clientUser && botUser && (await isAuthorizedAsUser())) {
-		const inputPeer = await getInputPeer(checkedClient, clientUser, botUser, botMsg);
-		message = await getMessage(checkedClient, inputPeer, botMsg);
-	}
-
-	const progressBarMessage =
-		fileSize > _3MB ? await createProgressBar(bot, botMsg, ProgressBarType.DOWNLOADING) : undefined;
-	return await checkedClient
-		.downloadMedia(message || convertBotFileToMessageMedia(fileId || "", fileSize), {
-			progressCallback: async (receivedBytes, totalBytes) => {
-				stage = await updateProgressBar(
-					bot,
-					botMsg,
-					progressBarMessage,
-					totalBytes.toJSNumber() || fileSize,
-					receivedBytes.toJSNumber(),
-					stage,
-				);
+	try {
+		const bytes = await checkedClient.downloadMedia(message, {
+			progressCallback: async (received, total) => {
+				const length = received.toJSNumber();
+				if (length > maxUserDownloadBytes || total.toJSNumber() > maxUserDownloadBytes) {
+					throw new Error("The attachment exceeds the download limit.");
+				}
+				stage = await updateProgressBar(bot, botMsg, progress, total.toJSNumber() || fileSize, length, stage);
 			},
-		})
-		.then(async (data) => {
-			return data;
-		})
-		.finally(async () => {
-			await deleteProgressBar(bot, botMsg, progressBarMessage);
 		});
+		if (!Buffer.isBuffer(bytes) || bytes.length > maxUserDownloadBytes)
+			throw new Error("Attachment could not be saved.");
+		return bytes;
+	} finally {
+		await deleteProgressBar(bot, botMsg, progress).catch(() => undefined);
+	}
 }
 
-export async function sendReaction(botUser: TelegramBot.User, botMsg: TelegramBot.Message, emoticon: string) {
+export async function sendReaction(botUser: User, botMsg: Message, emoticon: string) {
 	const { checkedClient, checkedUser } = await checkUserService();
 	const inputPeer = await getInputPeer(checkedClient, checkedUser, botUser, botMsg);
 	const message = await getMessage(checkedClient, inputPeer, botMsg);
@@ -245,18 +157,17 @@ export async function sendReaction(botUser: TelegramBot.User, botMsg: TelegramBo
 
 export async function transcribeAudio(
 	bot: TelegramBot,
-	botMsg: TelegramBot.Message,
-	botUser?: TelegramBot.User,
+	botMsg: Message,
+	botUser?: User,
 	mediaId?: string,
 	limit = 15, // minutes for waiting transcribing (not for the audio)
 ): Promise<string> {
 	if (botMsg.text || !(botMsg.voice || botMsg.video_note)) {
 		return "";
 	}
-	if (!_voiceTranscripts) _voiceTranscripts = new Map();
-	if (_voiceTranscripts.size > 100) _voiceTranscripts.clear();
-	if (_voiceTranscripts.has(`${botMsg.chat.id}_${botMsg.message_id}`))
-		return _voiceTranscripts.get(`${botMsg.chat.id}_${botMsg.message_id}`) || "";
+	if (voiceTranscripts.size > 100) voiceTranscripts.clear();
+	if (voiceTranscripts.has(`${botMsg.chat.id}_${botMsg.message_id}`))
+		return voiceTranscripts.get(`${botMsg.chat.id}_${botMsg.message_id}`) || "";
 
 	const { checkedClient, checkedUser } = await checkUserService();
 	if (!checkedUser.premium) {
@@ -280,7 +191,7 @@ export async function transcribeAudio(
 					msgId: message.id,
 				}),
 			);
-			stage = await updateProgressBar(bot, botMsg, progressBarMessage, 14, i, stage);
+			stage = await updateProgressBar(bot, botMsg, progressBarMessage, limit * 14, i, stage);
 			if (transcribedAudio.pending)
 				await new Promise((resolve) => setTimeout(resolve, _5sec)); // 5 sec delay between updates
 			else if (i == limit * 14)
@@ -288,10 +199,10 @@ export async function transcribeAudio(
 			else break;
 		}
 	} finally {
-		await deleteProgressBar(bot, botMsg, progressBarMessage);
+		await deleteProgressBar(bot, botMsg, progressBarMessage).catch(() => undefined);
 	}
-	if (!transcribedAudio) throw new Error("Can't transcribe the audio");
-	if (!_voiceTranscripts.has(`${botMsg.chat.id}_${botMsg.message_id}`))
-		_voiceTranscripts.set(`${botMsg.chat.id}_${botMsg.message_id}`, transcribedAudio.text);
+	if (!transcribedAudio || transcribedAudio.pending) throw new Error("Could not complete the transcription.");
+	if (!voiceTranscripts.has(`${botMsg.chat.id}_${botMsg.message_id}`))
+		voiceTranscripts.set(`${botMsg.chat.id}_${botMsg.message_id}`, transcribedAudio.text);
 	return transcribedAudio.text;
 }

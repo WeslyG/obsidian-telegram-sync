@@ -137,11 +137,19 @@ export class BotProxySettingsModal extends Modal {
 							"Could not save proxy settings. Proxy authentication requires Obsidian 1.11.4 or later.",
 						);
 						button.setDisabled(false);
-						if (credentialsSaved) saveProxyCredentials(this.app, previousCredentials);
+						if (credentialsSaved) {
+							try {
+								saveProxyCredentials(this.app, previousCredentials);
+							} catch {
+								new Notice(
+									"Could not restore the previous proxy credentials in Obsidian secret storage.",
+								);
+							}
+						}
 						return;
 					}
 					this.close();
-					if (settings.botToken) {
+					if (this.plugin.getBotToken()) {
 						await this.plugin.setBotStatus("disconnected");
 						await enqueue(this.plugin, this.plugin.initTelegram, "bot");
 					}

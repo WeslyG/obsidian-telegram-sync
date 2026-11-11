@@ -1,20 +1,21 @@
-import TelegramBot from "node-telegram-bot-api";
-import { checkIfTooManyRequests, isTooManyRequests } from "./tooManyRequests";
+import type TelegramBot from "src/telegram/bot/api";
+import type { Message } from "src/telegram/bot/apiTypes";
+import { BotApiError } from "./api";
 
 export enum ProgressBarType {
 	DOWNLOADING = "downloading",
 	DELETING = "deleting",
-	STORED = "stored",
 	TRANSCRIBING = "transcribing",
 }
 
 export const _3MB = 3 * 1024 * 1024;
+const retryAt = new WeakMap<TelegramBot, number>();
 
 export async function createProgressBar(
 	bot: TelegramBot,
-	msg: TelegramBot.Message,
+	msg: Message,
 	action: ProgressBarType,
-): Promise<TelegramBot.Message | undefined> {
+): Promise<Message | undefined> {
 	return await bot.sendMessage(msg.chat.id, action, {
 		reply_to_message_id: msg.message_id,
 		reply_markup: { inline_keyboard: createProgressBarKeyboard(0).inline_keyboard },
@@ -25,15 +26,15 @@ export async function createProgressBar(
 // redraw the progress bar to current process state
 export async function updateProgressBar(
 	bot: TelegramBot,
-	msg: TelegramBot.Message,
-	progressBarMessage: TelegramBot.Message | undefined,
+	msg: Message,
+	progressBarMessage: Message | undefined,
 	total: number,
 	current: number,
 	previousStage: number,
 ): Promise<number> {
 	if (!progressBarMessage) return 0;
-	const stage = Math.ceil((current / total) * 10);
-	if (previousStage == stage || isTooManyRequests) return stage;
+	const stage = total > 0 ? Math.max(0, Math.min(10, Math.ceil((current / total) * 10))) : 0;
+	if (previousStage === stage || (retryAt.get(bot) ?? 0) > Date.now()) return previousStage;
 	try {
 		await bot.editMessageReplyMarkup(
 			{
@@ -42,16 +43,13 @@ export async function updateProgressBar(
 			{ chat_id: msg.chat.id, message_id: progressBarMessage.message_id },
 		);
 	} catch (e) {
-		if (!checkIfTooManyRequests(e)) console.log(`Telegram Sync => ${e}`);
+		if (e instanceof BotApiError && e.status === 429) retryAt.set(bot, Date.now() + (e.retryAfter ?? 5) * 1000);
+		return previousStage;
 	}
 	return stage;
 }
 
-export async function deleteProgressBar(
-	bot: TelegramBot,
-	msg: TelegramBot.Message,
-	progressBarMessage: TelegramBot.Message | undefined,
-) {
+export async function deleteProgressBar(bot: TelegramBot, msg: Message, progressBarMessage: Message | undefined) {
 	if (!progressBarMessage) return;
 	await bot.deleteMessage(msg.chat.id, progressBarMessage.message_id);
 }

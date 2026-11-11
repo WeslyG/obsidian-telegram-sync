@@ -8,7 +8,7 @@ export enum ConditionType {
 	VOICE_TRANSCRIPT = "voiceTranscript",
 }
 
-enum ConditionOperation {
+export enum ConditionOperation {
 	EQUAL = "=",
 	NOT_EQUAL = "!=",
 	CONTAIN = "~",
@@ -76,7 +76,8 @@ export function createBlankMessageDistributionRule(): MessageDistributionRule {
 }
 
 export function extractConditionsFromFilterQuery(messageFilterQuery: string): MessageFilterCondition[] {
-	if (!messageFilterQuery || messageFilterQuery == `{{${ConditionType.ALL}}}`)
+	const query = messageFilterQuery.trim();
+	if (!query || query === defaultMessageFilterQuery)
 		return [
 			{
 				conditionType: ConditionType.ALL,
@@ -84,18 +85,13 @@ export function extractConditionsFromFilterQuery(messageFilterQuery: string): Me
 				value: "",
 			},
 		];
-	const filterQueryPattern = /\{{([^{}=!~]+)(=|!=|~|!~)([^{}]+)\}}/g;
-	const matches = [...messageFilterQuery.matchAll(filterQueryPattern)];
-
-	// Check for unbalanced braces
-	const openBracesCount = (messageFilterQuery.match(/\{{/g) || []).length;
-	const closeBracesCount = (messageFilterQuery.match(/\}}/g) || []).length;
-	if (openBracesCount !== closeBracesCount) {
-		throw new Error("Unbalanced braces in filter query.");
-	}
+	const filterQueryPattern = /\{\{([^{}=!~]+)(!=|!~|=|~)([^{}]+)\}\}/g;
+	const matches = [...query.matchAll(filterQueryPattern)];
+	if (!matches.length || query.replace(filterQueryPattern, "").trim()) throw new Error("Invalid filter query.");
 
 	return matches.map((match) => {
-		const [, conditionType, operation, value] = match;
+		const [, conditionType, operation, rawValue] = match;
+		const value = rawValue.trim();
 
 		if (!value) {
 			throw new Error(`Empty value for condition type: ${conditionType}`);

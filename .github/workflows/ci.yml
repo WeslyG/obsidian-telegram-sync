@@ -28,7 +28,13 @@ jobs:
               with:
                   node-version-file: .node-version
                   cache: npm
-            - run: npm ci
+            - name: Verify registry and lockfile integrity metadata
+              run: node scripts/check-lockfile.mjs
+            - run: npm ci --ignore-scripts --no-audit
+            - name: Check dependency advisories
+              run: npm audit --audit-level=high
+            - name: Verify npm registry signatures
+              run: npm audit signatures
             - name: Verify release tag
               if: inputs.release_tag != ''
               env:

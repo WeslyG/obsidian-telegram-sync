@@ -1,88 +1,108 @@
-import TelegramSyncPlugin from "src/main";
+import type TelegramSyncPlugin from "src/main";
 import * as Client from "./client";
-import { StatusMessages, displayAndLogError } from "src/utils/logUtils";
-import { enqueue } from "src/utils/queues";
+import { clearCachedUnprocessedMessages } from "./sync";
 
-export async function connect(
-	plugin: TelegramSyncPlugin,
-	sessionType: Client.SessionType,
-	sessionId?: number,
-	qrCodeContainer?: HTMLDivElement,
-	password?: string,
-): Promise<string | undefined> {
-	if (plugin.checkingUserConnection) return;
-	if (!(sessionType == "user" || plugin.settings.botToken !== "")) return;
-	if (sessionType == "user" && !sessionId && !qrCodeContainer) return;
+const secretId = "telegram-sync-user-session";
+
+interface UserSession extends Client.TelegramAppCredentials {
+	session: string;
+}
+
+interface Login extends Client.TelegramAppCredentials {
+	container: HTMLDivElement;
+	password: string;
+	signal: AbortSignal;
+}
+
+function readSession(plugin: TelegramSyncPlugin): UserSession | undefined {
+	const raw = plugin.app.secretStorage?.getSecret(secretId);
+	if (!raw) return;
+	try {
+		const value = JSON.parse(raw);
+		if (
+			Number.isSafeInteger(value.apiId) &&
+			typeof value.apiHash === "string" &&
+			typeof value.session === "string" &&
+			value.session
+		) {
+			return value;
+		}
+	} catch {
+		// An invalid stored record cannot start a network connection.
+	}
+}
+
+export function hasSession(plugin: TelegramSyncPlugin): boolean {
+	return !!readSession(plugin);
+}
+
+export async function connect(plugin: TelegramSyncPlugin, login?: Login): Promise<string | undefined> {
+	if (plugin.checkingUserConnection) return "Telegram user connection is already in progress.";
+	const stored = readSession(plugin);
+	if (!stored && !login) return;
+	if (plugin.status === "unloading" || plugin.status === "unloaded") return "Telegram Sync is closing.";
+	if (plugin.settings.mainDeviceId && plugin.settings.mainDeviceId !== plugin.currentDeviceId)
+		return "Telegram Sync is paused on this device.";
+
+	const credentials = login ?? stored;
+	if (!credentials) return;
+	if (
+		!Number.isSafeInteger(credentials.apiId) ||
+		credentials.apiId <= 0 ||
+		credentials.apiId > 2147483647 ||
+		!/^[0-9a-f]{32}$/i.test(credentials.apiHash)
+	)
+		return "Enter a valid Telegram API ID and API hash.";
 
 	plugin.checkingUserConnection = true;
+	const stopOnAbort = () => {
+		void Client.stop();
+	};
+	login?.signal.addEventListener("abort", stopOnAbort, { once: true });
 	try {
-		const newSessionId = sessionId || Client.getNewSessionId();
-		if (sessionType == "bot" && !sessionId) {
-			plugin.settings.telegramSessionId = newSessionId;
-			plugin.settings.telegramSessionType = sessionType;
-			await plugin.saveSettings();
-		}
+		const session = await Client.init(credentials, login ? "" : (stored?.session ?? ""), login?.signal);
+		if (login) await Client.signInAsUserWithQrCode(credentials, login.container, login.password, login.signal);
+		await Client.authorizeUser();
+		login?.signal.throwIfAborted();
+		if (plugin.status !== "loaded") throw new Error("Telegram Sync is not active.");
+		const serialized = session.save();
+		if (!serialized) throw new Error("Could not save the Telegram session.");
+		plugin.app.secretStorage.setSecret(
+			secretId,
+			JSON.stringify({
+				apiId: credentials.apiId,
+				apiHash: credentials.apiHash,
+				session: serialized,
+			}),
+		);
+		plugin.userConnected = true;
+	} catch {
+		await disconnect(plugin);
+		return login?.signal.aborted ? "Telegram login cancelled." : "Could not connect the Telegram user.";
+	} finally {
+		login?.signal.removeEventListener("abort", stopOnAbort);
+		plugin.checkingUserConnection = false;
+	}
+}
 
-		await Client.init(newSessionId, sessionType, plugin.currentDeviceId);
-
-		if (sessionType == "user" && qrCodeContainer) {
-			await Client.signInAsUserWithQrCode(qrCodeContainer, password);
+export async function logOut(plugin: TelegramSyncPlugin) {
+	if (plugin.checkingUserConnection) throw new Error("Telegram user connection is already in progress.");
+	plugin.checkingUserConnection = true;
+	try {
+		const stored = readSession(plugin);
+		if (stored) {
+			if (!plugin.userConnected) await Client.init(stored, stored.session);
+			await Client.revokeSession();
 		}
-
-		plugin.userConnected = await Client.isAuthorizedAsUser();
-
-		if (sessionType == "bot" || !plugin.userConnected) {
-			await Client.signInAsBot(await enqueue(plugin, plugin.getBotToken));
-		}
-
-		if (sessionType == "user" && !plugin.userConnected) {
-			let qrError = qrCodeContainer?.getText();
-			qrError = qrError?.contains("Error") ? qrError : "See errors in console (CTRL + SHIFT + I)";
-			return `Connection failed.\n${qrError}`;
-		}
-
-		if (plugin.userConnected && !sessionId) {
-			plugin.settings.telegramSessionId = newSessionId;
-			plugin.settings.telegramSessionType = sessionType;
-			await plugin.saveSettings();
-		}
-	} catch (error) {
-		if (!error.message.includes("API_ID_PUBLISHED_FLOOD")) {
-			plugin.userConnected = false;
-			await displayAndLogError(plugin, error, "", "", undefined, 0);
-			return `Connection failed.\n${error.message}`;
-		}
+		plugin.app.secretStorage.setSecret(secretId, "");
+		await disconnect(plugin);
 	} finally {
 		plugin.checkingUserConnection = false;
 	}
 }
 
-export async function reconnect(plugin: TelegramSyncPlugin, displayError = false) {
-	if (plugin.checkingUserConnection) return;
-	plugin.checkingUserConnection = true;
-	try {
-		await Client.reconnect(false);
-		plugin.userConnected = await Client.isAuthorizedAsUser();
-	} catch (error) {
-		plugin.userConnected = false;
-		if (displayError && plugin.isBotConnected() && plugin.settings.telegramSessionType == "user") {
-			await displayAndLogError(
-				plugin,
-				error,
-				StatusMessages.USER_DISCONNECTED,
-				"Try restore the connection manually by restarting Obsidian or by refresh button in the plugin settings!",
-			);
-		}
-	} finally {
-		plugin.checkingUserConnection = false;
-	}
-}
-
-// Stop connection as user
 export async function disconnect(plugin: TelegramSyncPlugin) {
-	try {
-		await Client.stop();
-	} finally {
-		plugin.userConnected = false;
-	}
+	plugin.userConnected = false;
+	clearCachedUnprocessedMessages();
+	await Client.stop();
 }

@@ -1,190 +1,121 @@
-import { Modal, Setting } from "obsidian";
-import TelegramSyncPlugin from "src/main";
-import { proxyGuideLink, repositoryUrl } from "release-notes.mjs";
-import { _5sec, displayAndLog } from "src/utils/logUtils";
-import { PinCodeModal } from "./PinCode";
+import { Modal, Notice, Setting } from "obsidian";
+import type TelegramSyncPlugin from "src/main";
+import { proxyGuideLink } from "release-notes.mjs";
+import { isBotToken } from "src/telegram/bot/api";
+import { normalizeAllowedChats } from "src/telegram/bot/access";
 
 export const mainDeviceIdSettingName = "Main device id";
 
 export class BotSettingsModal extends Modal {
-	botSettingsDiv: HTMLDivElement;
-	saved = false;
-	constructor(public plugin: TelegramSyncPlugin) {
+	private token?: string;
+	private allowedChats: string;
+	private mainDeviceId: string;
+
+	constructor(
+		private plugin: TelegramSyncPlugin,
+		private onSaved: () => Promise<void>,
+	) {
 		super(plugin.app);
-	}
-
-	async display() {
-		this.addHeader();
-		this.addBotToken();
-		this.addAllowedChatsSetting();
-		this.addDeviceId();
-		this.addEncryptionByPinCode();
-		this.addFooterButtons();
-	}
-
-	addHeader() {
-		this.contentEl.empty();
-		this.botSettingsDiv = this.contentEl.createDiv();
-		this.titleEl.setText("Bot settings");
-		const limitations = new Setting(this.botSettingsDiv).setDesc("⚠ Limitations of Telegram bot:");
-		const lim24Hours = document.createElement("div");
-		lim24Hours.setText("- It can get only messages sent within the last 24 hours");
-		lim24Hours.style.marginLeft = "10px";
-		const limBlocks = document.createElement("div");
-		limBlocks.style.marginLeft = "10px";
-		limBlocks.setText("- If the bot cannot connect directly, see the ");
-		limBlocks.createEl("a", {
-			href: proxyGuideLink,
-			text: "bot proxy setup guide",
-		});
-		limitations.descEl.appendChild(lim24Hours);
-		limitations.descEl.appendChild(limBlocks);
-	}
-
-	addBotToken() {
-		new Setting(this.botSettingsDiv)
-			.setName("Bot token (required)")
-			.setDesc("Enter your Telegram bot token.")
-			.addText(async (text) => {
-				text.setPlaceholder("example: 6123456784:AAX9mXnFE2q9WahQ")
-					.setValue(await this.plugin.getBotToken())
-					.onChange(async (value: string) => {
-						if (!value) {
-							text.inputEl.style.borderColor = "red";
-							text.inputEl.style.borderWidth = "2px";
-							text.inputEl.style.borderStyle = "solid";
-						}
-						this.plugin.settings.botToken = value;
-						this.plugin.settings.botTokenEncrypted = false;
-					});
-			});
-	}
-
-	addAllowedChatsSetting() {
-		const allowedChatsSetting = new Setting(this.botSettingsDiv)
-			.setName("Allowed chats (required)")
-			.setDesc(
-				"Enter list of usernames or chat ids that should be processed. At least your username must be entered.",
-			)
-			.addTextArea((text) => {
-				const textArea = text
-					.setPlaceholder("example: example_user,1227636")
-					.setValue(this.plugin.settings.allowedChats.join(", "))
-					.onChange(async (value: string) => {
-						value = value.replace(/\s/g, "");
-						if (!value) {
-							textArea.inputEl.style.borderColor = "red";
-							textArea.inputEl.style.borderWidth = "2px";
-							textArea.inputEl.style.borderStyle = "solid";
-						}
-						this.plugin.settings.allowedChats = value.split(",");
-					});
-			});
-		// add link to Telegram FAQ about getting username
-		const howDoIGetUsername = document.createElement("div");
-		howDoIGetUsername.textContent = "To get help click on -> ";
-		howDoIGetUsername.createEl("a", {
-			href: "https://telegram.org/faq?setln=en#q-what-are-usernames-how-do-i-get-one",
-			text: "Telegram FAQ",
-		});
-		allowedChatsSetting.descEl.appendChild(howDoIGetUsername);
-	}
-
-	addDeviceId() {
-		const deviceIdSetting = new Setting(this.botSettingsDiv)
-			.setName(mainDeviceIdSettingName)
-			.setDesc(
-				"Specify the device to be used for sync when running Obsidian simultaneously on multiple desktops. If not specified, the priority will shift unpredictably.",
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("example: 98912984-c4e9-5ceb-8000-03882a0485e4")
-					.setValue(this.plugin.settings.mainDeviceId)
-					.onChange((value) => (this.plugin.settings.mainDeviceId = value)),
-			);
-
-		// current device id copy to settings
-		const deviceIdLink = deviceIdSetting.descEl.createDiv();
-		deviceIdLink.textContent = "To make the current device as main, click on -> ";
-		deviceIdLink
-			.createEl("a", {
-				href: this.plugin.currentDeviceId,
-				text: this.plugin.currentDeviceId,
-			})
-			.onClickEvent((evt) => {
-				evt.preventDefault();
-				// oxlint-disable-next-line typescript/no-explicit-any
-				let inputDeviceId: any;
-				try {
-					inputDeviceId = deviceIdSetting.controlEl.firstElementChild;
-					inputDeviceId.value = this.plugin.currentDeviceId;
-				} catch (error) {
-					displayAndLog(this.plugin, `Try to copy and paste device id manually. Error: ${error}`, _5sec);
-				}
-				if (inputDeviceId && inputDeviceId.value)
-					this.plugin.settings.mainDeviceId = this.plugin.currentDeviceId;
-			});
-	}
-
-	addEncryptionByPinCode() {
-		const botTokenSetting = new Setting(this.botSettingsDiv)
-			.setName("Bot token encryption using a PIN code")
-			.setDesc(
-				"Encrypt the bot token for enhanced security. When enabled, a PIN code is required at each Obsidian launch. ",
-			)
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.encryptionByPinCode);
-				toggle.onChange(async (value) => {
-					if (this.plugin.settings.botTokenEncrypted) {
-						this.plugin.settings.botToken = await this.plugin.getBotToken();
-						this.plugin.settings.botTokenEncrypted = false;
-					}
-					this.plugin.settings.encryptionByPinCode = value;
-					if (!value) {
-						this.plugin.pinCode = undefined;
-						return;
-					}
-					const pinCodeModal = new PinCodeModal(this.plugin, false);
-					pinCodeModal.onClose = async () => {
-						if (pinCodeModal.saved && this.plugin.pinCode) return;
-						this.plugin.settings.encryptionByPinCode = false;
-					};
-					pinCodeModal.open();
-				});
-			});
-		botTokenSetting.descEl.createEl("a", {
-			href: `${repositoryUrl}/blob/main/docs/Bot%20Token%20Encryption.md`,
-			text: "What does this can prevent?",
-		});
-	}
-
-	addFooterButtons() {
-		this.botSettingsDiv.createEl("br");
-		const footerButtons = new Setting(this.contentEl.createDiv());
-		footerButtons.addButton((b) => {
-			b.setTooltip("Connect")
-				.setIcon("checkmark")
-				.onClick(async () => {
-					if (!this.plugin.settings.botTokenEncrypted) this.plugin.botTokenEncrypt();
-					await this.plugin.saveSettings();
-					this.saved = true;
-					this.close();
-				});
-			return b;
-		});
-		footerButtons.addExtraButton((b) => {
-			b.setIcon("cross")
-				.setTooltip("Cancel")
-				.onClick(async () => {
-					await this.plugin.loadSettings();
-					this.saved = false;
-					this.close();
-				});
-			return b;
-		});
+		this.allowedChats = plugin.settings.allowedChats.join(", ");
+		this.mainDeviceId = plugin.settings.mainDeviceId;
 	}
 
 	onOpen() {
-		this.display();
+		this.titleEl.setText("Bot settings");
+		const tokenSetting = new Setting(this.contentEl)
+			.setName("Bot token")
+			.setDesc("Stored in Obsidian's local secret storage.");
+		tokenSetting.addText((text) => {
+			text.inputEl.type = "password";
+			text.setPlaceholder(this.plugin.getBotToken() ? "Token is stored" : "Telegram bot token").onChange(
+				(value) => {
+					this.token = value.trim() || undefined;
+				},
+			);
+			if (this.plugin.getBotToken()) {
+				tokenSetting.addButton((button) =>
+					button.setButtonText("Remove token").onClick(() => {
+						text.setValue("").setPlaceholder("Token will be removed when saved");
+						this.token = "";
+					}),
+				);
+			}
+		});
+
+		new Setting(this.contentEl)
+			.setName("Allowed chats")
+			.setDesc("Comma-separated usernames or Telegram chat IDs. Leave empty to block all imports.")
+			.addTextArea((text) =>
+				text
+					.setPlaceholder("example_user, -1001234567890")
+					.setValue(this.allowedChats)
+					.onChange((value) => {
+						this.allowedChats = value;
+					}),
+			);
+
+		const device = new Setting(this.contentEl)
+			.setName(mainDeviceIdSettingName)
+			.setDesc("Select one device when the same vault runs on multiple desktops.");
+		device.addText((text) => {
+			text.setValue(this.mainDeviceId).onChange((value) => {
+				this.mainDeviceId = value.trim();
+			});
+			device.addButton((button) =>
+				button.setButtonText("Use this device").onClick(() => {
+					this.mainDeviceId = this.plugin.currentDeviceId;
+					text.setValue(this.mainDeviceId);
+				}),
+			);
+		});
+
+		this.contentEl.createEl("a", { text: "Bot proxy setup guide", href: proxyGuideLink });
+		new Setting(this.contentEl).addButton((button) =>
+			button
+				.setButtonText("Save")
+				.setCta()
+				.onClick(async () => {
+					const token = this.token;
+					if (token && !isBotToken(token)) {
+						new Notice("Enter a valid Telegram bot token.");
+						return;
+					}
+					button.setDisabled(true);
+					const previousToken = this.plugin.getBotToken();
+					const settings = this.plugin.settings;
+					const previousChats = settings.allowedChats;
+					const previousDevice = settings.mainDeviceId;
+					let tokenSaved = false;
+					try {
+						if (token !== undefined) {
+							this.plugin.setBotToken(token);
+							tokenSaved = true;
+						}
+						settings.allowedChats = normalizeAllowedChats(this.allowedChats.split(","));
+						settings.mainDeviceId = this.mainDeviceId;
+						await this.plugin.saveSettings();
+					} catch {
+						settings.allowedChats = previousChats;
+						settings.mainDeviceId = previousDevice;
+						new Notice("Could not save Telegram Sync settings.");
+						button.setDisabled(false);
+						if (tokenSaved) {
+							try {
+								this.plugin.setBotToken(previousToken);
+							} catch {
+								new Notice("Could not restore the previous bot token in Obsidian secret storage.");
+							}
+						}
+						return;
+					}
+					this.close();
+					await this.onSaved().catch(() => new Notice("Settings saved. Telegram Sync could not reconnect."));
+				}),
+		);
+	}
+
+	onClose() {
+		this.token = undefined;
+		this.contentEl.empty();
 	}
 }

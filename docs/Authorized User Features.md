@@ -1,5 +1,9 @@
 #### Authorized User Features
 
+The bot works without a user session. To enable these features, use **Telegram user → Log in**, enter an API ID and hash from [my.telegram.org](https://my.telegram.org/apps), and confirm the QR login in Telegram. Obsidian stores the credentials and session in per-vault secret storage. **Log out** revokes the session through Telegram and clears the local copy. This optional connection goes directly to Telegram, separately from the Bot API proxy.
+
+Old-message recovery is opt-in and forwards messages within selected, allowed Telegram chats. Downloads through the user session are capped at 128 MiB.
+
 ##### Telegram Premium subscribers
 
 ✅ voice and video notes transcription using template variable {{voiceTranscript}}<br/>

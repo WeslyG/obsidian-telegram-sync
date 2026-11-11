@@ -1,5 +1,6 @@
-import TelegramBot from "node-telegram-bot-api";
+import type { Message } from "src/telegram/bot/apiTypes";
 import { Notice } from "obsidian";
+import { BotApiError } from "src/telegram/bot/api";
 import TelegramSyncPlugin from "src/main";
 import { stopUpdatingProcessingDate } from "src/telegram/user/sync";
 
@@ -22,7 +23,7 @@ export enum StatusMessages {
 	USER_DISCONNECTED = "Telegram user is disconnected!",
 }
 
-export let errorCache = "";
+export let errorCache = false;
 
 interface PersistentNotice {
 	notice: Notice;
@@ -37,10 +38,10 @@ export function displayAndLog(plugin: TelegramSyncPlugin, message: string, timeo
 	if (timeout == 0) return;
 	const notice = new Notice(message, timeout || _day);
 
-	const hideBotDisconnectedMessages = message.contains(StatusMessages.BOT_CONNECTED);
+	const hideBotDisconnectedMessages = message.includes(StatusMessages.BOT_CONNECTED);
 	persistentNotices = persistentNotices.filter((persistentNotice) => {
 		const shouldHide =
-			(hideBotDisconnectedMessages && persistentNotice.message.contains(StatusMessages.BOT_DISCONNECTED)) ||
+			(hideBotDisconnectedMessages && persistentNotice.message.includes(StatusMessages.BOT_DISCONNECTED)) ||
 			persistentNotice.message == message;
 		if (shouldHide) {
 			persistentNotice.notice.hide();
@@ -51,53 +52,21 @@ export function displayAndLog(plugin: TelegramSyncPlugin, message: string, timeo
 	if (!timeout) persistentNotices.push({ notice, message });
 }
 
-// Show error to console, telegram, display
-export async function displayAndLogError(
+export function displayAndLogError(
 	plugin: TelegramSyncPlugin,
-	error: Error,
+	error: unknown,
 	status?: string,
 	action?: string,
-	msg?: TelegramBot.Message,
-	timeout?: number, // 0 - do not show in obsidian | undefined - never hide
+	msg?: Message,
+	timeout?: number,
 	addToCache?: boolean,
 ) {
-	let beautyError = `${error.name}: ${error.message.replace(/Error: /g, "")}\n${status || ""}\n${action || ""}`;
-	beautyError = beautyError.trim();
-	displayAndLog(plugin, beautyError, timeout);
-	if (error.stack) console.log(error.stack);
-	if (msg) {
-		await plugin.bot?.sendMessage(msg.chat.id, `...❌...\n\n${beautyError}`, {
-			reply_to_message_id: msg.message_id,
-		});
-	}
-	if (addToCache)
-		errorCache = `${errorCache || ""}\n\n${status || ""}\n${error.name}: ${error.message.replace(/Error: /g, "")}`;
+	const detail = error instanceof BotApiError ? error.message : "Telegram Sync operation failed.";
+	displayAndLog(plugin, [detail, status, action].filter(Boolean).join("\n"), timeout);
+	if (addToCache) errorCache = true;
 	if (msg && plugin.settings.retryFailedMessagesProcessing) stopUpdatingProcessingDate();
 }
 
 export function cleanErrorCache() {
-	errorCache = "";
-}
-
-// changing GramJs version can cause cache issues and wrong alerts, so it's cure for it
-export function hideMTProtoAlerts(plugin: TelegramSyncPlugin) {
-	// oxlint-disable-next-line typescript/no-explicit-any
-	const originalAlert = window.alert as any;
-	if (!originalAlert.__isOverridden) {
-		// oxlint-disable-next-line typescript/no-explicit-any
-		window.alert = function (message?: any) {
-			if (message.includes("Missing MTProto Entity")) {
-				localStorage.removeItem("GramJs:apiCache");
-				plugin.settings.cacheCleanupAtStartup = true;
-				plugin.saveSettings();
-				displayAndLog(
-					plugin,
-					"Telegram Sync got errors during cache cleanup from the previous plugin version.\n\nPlease close all instances of Obsidian and restart it. You may need to repeat it twice.\n\nApologize for the inconvenience",
-				);
-				return;
-			}
-			originalAlert(message);
-		};
-		originalAlert.__isOverridden = true;
-	}
+	errorCache = false;
 }

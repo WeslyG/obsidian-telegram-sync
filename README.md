@@ -31,6 +31,8 @@ Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsi
 
 ## 📦 Installation
 
+Requires desktop Obsidian 1.11.4 or later. See [bot token storage](./docs/Bot%20Token%20Encryption.md) before upgrading an existing installation.
+
 1. Download `main.js`, `styles.css`, and `manifest.json` from [GitHub Releases](https://github.com/WeslyG/obsidian-telegram-sync/releases).
 2. Copy the downloaded files to <path-to-your-vault>/.obsidian/plugins/telegram-sync/
 3. Restart Obsidian and enable **Telegram Sync** in the Community plugins tab
@@ -41,7 +43,7 @@ Transfer messages and files from [Telegram](https://telegram.org/) to your [Obsi
 2. Copy the bot token provided by the @botFather
 3. Open the Obsidian settings and navigate to the **Telegram Sync** settings tab
 4. Paste your bot token to **Bot > Connect > Bot Token** field
-5. Configure the remaining settings according to your preferences
+5. Add your Telegram username or a chat ID to **Allowed chats**. An empty list blocks all imports.
 6. Start sending messages and files to your Telegram bot
 7. When the Obsidian app is running on your laptop or PC, it syncs all your messages
 8. You can optionally add your bot to any chats that you want to sync (the bot needs admin rights)

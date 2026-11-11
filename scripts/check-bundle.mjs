@@ -12,7 +12,7 @@ try {
 	mkdirSync(hostApi, { recursive: true });
 	writeFileSync(
 		join(hostApi, "index.js"),
-		`module.exports = { Plugin: class {}, Modal: class {}, PluginSettingTab: class {},
+		`module.exports = { Plugin: class {}, Modal: class {}, PluginSettingTab: class {}, AbstractInputSuggest: class {},
 		moment: require(${JSON.stringify(require.resolve("moment"))}) };`,
 	);
 	const bundle = join(dir, "main.cjs");

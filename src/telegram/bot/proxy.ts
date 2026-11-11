@@ -107,11 +107,11 @@ class Socks5Agent extends Agent {
 	}
 }
 
-export function createBotProxyRequest(value: string, credentials?: ProxyCredentials) {
+export function createBotProxyAgent(value: string, credentials?: ProxyCredentials) {
 	if (!value.trim()) return;
 	const url = parseProxyUrl(value.trim());
 	if (credentials) validateProxyCredentials(url, credentials);
-	const agent = url.protocol.startsWith("socks5")
+	return url.protocol.startsWith("socks5")
 		? new Socks5Agent(url, credentials)
 		: new HttpsProxyAgent(url, {
 				headers: () => {
@@ -119,7 +119,5 @@ export function createBotProxyRequest(value: string, credentials?: ProxyCredenti
 					const token = Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64");
 					return { "Proxy-Authorization": `Basic ${token}` };
 				},
-		  });
-	// The request library must not add another proxy from HTTP(S)_PROXY.
-	return { agent, proxy: null };
+			});
 }

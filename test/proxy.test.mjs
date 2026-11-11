@@ -8,7 +8,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { build } from "esbuild";
-import TelegramBot from "node-telegram-bot-api";
 
 const buildDir = mkdtempSync(join(tmpdir(), "telegram-sync-test-"));
 after(() => rmSync(buildDir, { recursive: true, force: true }));
@@ -20,9 +19,11 @@ await build({
 	bundle: true,
 	platform: "node",
 });
-const { createBotProxyRequest, readProxyCredentials, saveProxyCredentials } = createRequire(import.meta.url)(
-	proxyModule,
-);
+const { createBotProxyAgent, readProxyCredentials, saveProxyCredentials } = createRequire(import.meta.url)(proxyModule);
+
+const apiModule = join(buildDir, "api.cjs");
+await build({ entryPoints: ["src/telegram/bot/api.ts"], outfile: apiModule, bundle: true, platform: "node" });
+const { default: TelegramBot } = createRequire(import.meta.url)(apiModule);
 
 const host = "telegram-sync.test";
 const credentials = { username: "proxy@user", password: "pass:word%+" };
@@ -142,16 +143,18 @@ for (const [protocol, proxy] of [
 				const port = await listen(t, proxy(origin, authenticate));
 				const proxyUrl = protocol + "://127.0.0.1:" + port;
 				function makeBot(auth) {
-					const request = createBotProxyRequest(proxyUrl, auth);
-					t.after(() => request.agent.destroy());
-					return new TelegramBot("local-token", { baseApiUrl: "http://" + host + ":" + origin, request });
+					const agent = createBotProxyAgent(proxyUrl, auth);
+					const bot = new TelegramBot("123:local-token", new URL("http://" + host + ":" + origin), agent);
+					t.after(() => bot.close());
+					return bot;
 				}
 
 				const bot = makeBot(authenticate ? credentials : undefined);
 				assert.equal((await bot.getMe()).username, "local_bot");
-				assert.deepEqual(await bot.getUpdates({ timeout: 0 }), []);
+				assert.deepEqual(await bot.getUpdates(0, 0), []);
 				const attachment = [];
-				for await (const chunk of bot.getFileStream("test-file")) attachment.push(chunk);
+				const file = await bot.openFile("test-file");
+				for await (const chunk of file.stream) attachment.push(chunk);
 				assert.equal(Buffer.concat(attachment).toString(), "test attachment");
 				assert.equal(requests, 4);
 
@@ -175,10 +178,36 @@ test("proxy credentials stay separate from the address", () => {
 	};
 	saveProxyCredentials(app, credentials);
 	assert.deepEqual(readProxyCredentials(app), credentials);
-	assert.equal(createBotProxyRequest(""), undefined);
-	assert.throws(() => createBotProxyRequest("http://user:password@proxy.test:8080"), /Authentication tab/);
+	assert.equal(createBotProxyAgent(""), undefined);
+	assert.throws(() => createBotProxyAgent("http://user:password@proxy.test:8080"), /Authentication tab/);
 	assert.throws(
-		() => createBotProxyRequest("socks5://proxy.test:1080", { username: "user", password: "я".repeat(128) }),
+		() => createBotProxyAgent("socks5://proxy.test:1080", { username: "user", password: "я".repeat(128) }),
 		/255 bytes/,
 	);
+});
+
+test("Bot API errors do not expose credentials or follow redirects", async (t) => {
+	const paths = [];
+	const origin = await listen(
+		t,
+		httpServer((request, response) => {
+			paths.push(request.url);
+			if (paths.length === 1) {
+				response.writeHead(302, { Location: "/unexpected-redirect" }).end();
+				return;
+			}
+			response.writeHead(400, { "Content-Type": "application/json" }).end(
+				JSON.stringify({
+					ok: false,
+					error_code: 400,
+					description: "123:local-token and /private/vault",
+				}),
+			);
+		}),
+	);
+	const bot = new TelegramBot("123:local-token", new URL(`http://127.0.0.1:${origin}`));
+	t.after(() => bot.close());
+	await assert.rejects(bot.getMe(), /getMe failed \(302\)/);
+	await assert.rejects(bot.getMe(), (error) => error.message === "Telegram Bot API getMe failed (400).");
+	assert.deepEqual(paths, ["/bot123:local-token/getMe", "/bot123:local-token/getMe"]);
 });

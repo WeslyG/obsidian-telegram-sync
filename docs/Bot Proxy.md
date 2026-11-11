@@ -21,6 +21,8 @@ The proxy carries Telegram Bot API requests, including polling and file download
 
 On the **Authentication** tab, enable **Use proxy authentication** and fill in **Username** and **Password**. Leave the switch off for an anonymous proxy. HTTP and HTTPS use Basic proxy authentication. SOCKS5 uses username/password authentication. Obsidian 1.11.4 or later is required to save credentials in Obsidian's local secret storage. Set them separately on each device that needs the proxy.
 
+HTTP and SOCKS5 proxy credentials travel without TLS between Obsidian and the proxy. Use a local or trusted network path for those listeners, or an HTTPS proxy to protect credentials in transit to the proxy itself.
+
 ## Troubleshooting
 
 - **Connection refused or timed out.** Verify that the proxy is running, its port is reachable from Obsidian, and you selected the protocol for that port. A VPN client's HTTP and SOCKS5 listeners can use different ports.

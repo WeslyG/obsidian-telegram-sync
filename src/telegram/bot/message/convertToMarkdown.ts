@@ -1,10 +1,11 @@
-import TelegramBot from "node-telegram-bot-api";
+import type { Message, MessageEntity } from "src/telegram/bot/apiTypes";
 import { getInlineUrls } from "./getters";
+import { markdownWebLink, sanitizeImportedMarkdown } from "./markdownSafety";
 
-export async function convertMessageTextToMarkdown(msg: TelegramBot.Message): Promise<string> {
+export async function convertMessageTextToMarkdown(msg: Message): Promise<string> {
 	let text = msg.text || msg.caption || "";
 	const entities = msg.entities || msg.caption_entities || [];
-	const copiedEntities: TelegramBot.MessageEntity[] = structuredClone(entities);
+	const copiedEntities: MessageEntity[] = structuredClone(entities);
 	copiedEntities.forEach((entity, index, updatedEntities) => {
 		const entityStart = entity.offset;
 		let entityEnd = entityStart + entity.length;
@@ -26,8 +27,6 @@ export async function convertMessageTextToMarkdown(msg: TelegramBot.Message): Pr
 				updateEntitiesOffset(updatedEntities, entity, index, 1, 1);
 				break;
 			case "underline":
-				entityText = `<u>${entityText}</u>`;
-				updateEntitiesOffset(updatedEntities, entity, index, 3, 4);
 				break;
 			case "strikethrough":
 				entityText = `~~${entityText}~~`;
@@ -43,8 +42,9 @@ export async function convertMessageTextToMarkdown(msg: TelegramBot.Message): Pr
 				break;
 			case "text_link":
 				if (entity.url) {
-					entityText = `[${entityText}](${entity.url})`;
-					updateEntitiesOffset(updatedEntities, entity, index, 1, entity.url.length + 3);
+					const originalLength = entityText.length;
+					entityText = markdownWebLink(entityText, entity.url);
+					updateEntitiesOffset(updatedEntities, entity, index, 0, entityText.length - originalLength);
 				}
 				break;
 			default:
@@ -53,12 +53,12 @@ export async function convertMessageTextToMarkdown(msg: TelegramBot.Message): Pr
 		text = beforeEntity + entityText + afterEntity;
 	});
 	const inlineUrls = getInlineUrls(msg);
-	return text + (inlineUrls ? `\n\n${inlineUrls}` : "");
+	return sanitizeImportedMarkdown(text) + (inlineUrls ? `\n\n${inlineUrls}` : "");
 }
 
 function updateEntitiesOffset(
-	currentEntities: TelegramBot.MessageEntity[],
-	currentEntity: TelegramBot.MessageEntity,
+	currentEntities: MessageEntity[],
+	currentEntity: MessageEntity,
 	currentIndex: number,
 	beforeOffset: number,
 	afterOffset: number,
@@ -68,8 +68,4 @@ function updateEntitiesOffset(
 		if (entity.offset >= currentEntity.offset) entity.offset += beforeOffset;
 		if (entity.offset > currentEntity.offset + currentEntity.length) entity.offset += afterOffset;
 	});
-}
-
-export function escapeRegExp(str: string) {
-	return str.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }

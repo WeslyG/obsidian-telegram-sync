@@ -1,7 +1,6 @@
+import type { Message } from "src/telegram/bot/apiTypes";
 import TelegramSyncPlugin from "src/main";
 import { App, ButtonComponent, PluginSettingTab, Setting, TextComponent } from "obsidian";
-import TelegramBot from "node-telegram-bot-api";
-import { createProgressBar, updateProgressBar, deleteProgressBar, ProgressBarType } from "src/telegram/bot/progressBar";
 import * as Client from "src/telegram/user/client";
 import { BotSettingsModal } from "./modals/BotSettings";
 import { BotProxySettingsModal } from "./modals/BotProxySettings";
@@ -39,27 +38,19 @@ export interface RefreshValues {
 	userConnected?: boolean;
 	checkingBotConnection?: boolean;
 	checkingUserConnection?: boolean;
-	telegramSessionType?: string;
+	userSessionSaved?: boolean;
 }
 
 export interface TelegramSyncSettings {
-	botToken: string;
-	encryptionByPinCode: boolean;
-	botTokenEncrypted: boolean;
 	deleteMessagesFromTelegram: boolean;
 	allowedChats: string[];
 	mainDeviceId: string;
-	pluginVersion: string;
-	telegramSessionType: Client.SessionType;
-	telegramSessionId: number;
 	connectionStatusIndicatorType: KeysOfConnectionStatusIndicatorType;
-	cacheCleanupAtStartup: boolean;
 	messageDistributionRules: MessageDistributionRule[];
 	defaultMessageDelimiter: boolean;
 	parallelMessageProcessing: boolean;
 	processOldMessages: boolean;
 	processOldMessagesSettings: ProcessOldMessagesSettings;
-	processOtherBotsMessages: boolean;
 	retryFailedMessagesProcessing: boolean;
 	proxyUrl: string;
 	proxyAuthentication: boolean;
@@ -68,23 +59,15 @@ export interface TelegramSyncSettings {
 }
 
 export const DEFAULT_SETTINGS: TelegramSyncSettings = {
-	botToken: "",
-	encryptionByPinCode: false,
-	botTokenEncrypted: false,
 	deleteMessagesFromTelegram: false,
-	allowedChats: [""],
+	allowedChats: [],
 	mainDeviceId: "",
-	pluginVersion: "",
-	telegramSessionType: "bot",
-	telegramSessionId: Client.getNewSessionId(),
 	connectionStatusIndicatorType: "CONSTANT",
-	cacheCleanupAtStartup: false,
 	messageDistributionRules: [createDefaultMessageDistributionRule()],
 	defaultMessageDelimiter: true,
 	parallelMessageProcessing: false,
 	processOldMessages: false,
 	processOldMessagesSettings: getDefaultProcessOldMessagesSettings(),
-	processOtherBotsMessages: false,
 	retryFailedMessagesProcessing: false,
 	proxyUrl: "",
 	proxyAuthentication: false,
@@ -107,14 +90,14 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 		const userConnected = this.plugin.userConnected;
 		const checkingBotConnection = this.plugin.checkingBotConnection;
 		const checkingUserConnection = this.plugin.checkingUserConnection;
-		const telegramSessionType = this.plugin.settings.telegramSessionType;
+		const userSessionSaved = User.hasSession(this.plugin);
 		if (
 			!this.refreshValues ||
 			botConnected != this.refreshValues.botConnected ||
 			userConnected != this.refreshValues.userConnected ||
 			checkingBotConnection != this.refreshValues.checkingBotConnection ||
 			checkingUserConnection != this.refreshValues.checkingUserConnection ||
-			telegramSessionType != this.plugin.settings.telegramSessionType
+			userSessionSaved !== this.refreshValues.userSessionSaved
 		) {
 			try {
 				if (!this.refreshValues) this.refreshValues = {};
@@ -124,7 +107,7 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 				this.refreshValues.userConnected = userConnected;
 				this.refreshValues.checkingBotConnection = checkingBotConnection;
 				this.refreshValues.checkingUserConnection = checkingUserConnection;
-				this.refreshValues.telegramSessionType = this.plugin.settings.telegramSessionType;
+				this.refreshValues.userSessionSaved = userSessionSaved;
 			}
 		}
 	}
@@ -207,21 +190,10 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 				if (this.plugin.checkingBotConnection) botSettingsButton.setButtonText("Restart");
 				else if (this.plugin.isBotConnected()) botSettingsButton.setButtonText("Settings");
 				else botSettingsButton.setButtonText("Connect");
-				botSettingsButton.onClick(async () => {
-					const botSettingsModal = new BotSettingsModal(this.plugin);
-					botSettingsModal.onClose = async () => {
-						if (botSettingsModal.saved) {
-							if (this.plugin.settings.telegramSessionType == "bot") {
-								this.plugin.settings.telegramSessionId = Client.getNewSessionId();
-								this.plugin.userConnected = false;
-							}
-							await this.plugin.saveSettings();
-							// Initialize the bot with the new token
-							this.plugin.setBotStatus("disconnected");
-							await enqueue(this.plugin, this.plugin.initTelegram);
-						}
-					};
-					botSettingsModal.open();
+				botSettingsButton.onClick(() => {
+					new BotSettingsModal(this.plugin, () =>
+						enqueue(this.plugin, this.plugin.initTelegram, "bot"),
+					).open();
 				});
 			});
 		// add link to botFather
@@ -235,70 +207,64 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 	}
 
 	async addUser() {
-		const userSettings = new Setting(this.containerEl)
-			.setName("User (optionally)")
-			.setDesc("Connect your telegram user. It's required only for ")
-			.addText(async (userStatus: TextComponent) => {
-				userStatus.setDisabled(true);
-				if (this.plugin.checkingUserConnection) {
-					userStatus.setValue("⏳ connecting...");
-				} else if (this.plugin.userConnected) {
-					userStatus.setValue(`👨🏽‍💻 ${Client.clientUser?.username || "connected"}`);
-				} else userStatus.setValue("❌ disconnected");
-			})
-			.addButton(async (userLogInButton: ButtonComponent) => {
-				if (this.plugin.settings.telegramSessionType == "user") userLogInButton.setButtonText("Log out");
-				else userLogInButton.setButtonText("Log in");
-				userLogInButton.onClick(async () => {
-					if (this.plugin.settings.telegramSessionType == "user") {
-						// Log Out
-						await User.connect(this.plugin, "bot");
-						displayAndLog(
-							this.plugin,
-							"Successfully logged out.\n\nBut you should also terminate the session manually in the Telegram app.",
-							_15sec,
-						);
-					} else {
-						// Log In
-						const initialSessionType = this.plugin.settings.telegramSessionType;
-						const userLogInModal = new UserLogInModal(this.plugin);
-						userLogInModal.onClose = async () => {
-							if (initialSessionType == "bot" && !this.plugin.userConnected) {
-								this.plugin.settings.telegramSessionType = initialSessionType;
-								await this.plugin.saveSettings();
-							}
-						};
-						userLogInModal.open();
-					}
-				});
-			});
-		if (this.plugin.settings.telegramSessionType == "user" && !this.plugin.userConnected) {
-			userSettings.addExtraButton(async (refreshButton) => {
-				refreshButton.setTooltip("Refresh");
-				refreshButton.setIcon("refresh-ccw");
-				refreshButton.onClick(async () => {
-					await User.connect(this.plugin, "user", this.plugin.settings.telegramSessionId);
-					refreshButton.setDisabled(true);
-				});
-			});
-		}
-
-		// add link to authorized user features
-		userSettings.descEl.createEl("a", {
-			href: `${repositoryUrl}/blob/main/docs/Authorized%20User%20Features.md`,
-			text: "a few secondary features",
+		const hasSession = User.hasSession(this.plugin);
+		const description = this.containerEl.createDiv({ text: "Optional Telegram account connection for " });
+		description.createEl("a", {
+			href: repositoryUrl + "/blob/main/docs/Authorized%20User%20Features.md",
+			text: "older messages, larger files, and transcription",
 		});
+		new Setting(this.containerEl)
+			.setName("Telegram user")
+			.setDesc("Uses a separate direct connection to Telegram. The bot proxy applies to Bot API only.")
+			.addText((status) => {
+				status.setDisabled(true);
+				status.setValue(
+					this.plugin.checkingUserConnection
+						? "Connecting…"
+						: this.plugin.userConnected
+							? (Client.clientUser?.username ?? "Connected")
+							: "Disconnected",
+				);
+			})
+			.addButton((button) =>
+				button
+					.setButtonText(hasSession ? "Log out" : "Log in")
+					.setDisabled(this.plugin.checkingUserConnection)
+					.onClick(async () => {
+						if (!hasSession) {
+							new UserLogInModal(this.plugin).open();
+							return;
+						}
+						try {
+							await User.logOut(this.plugin);
+							displayAndLog(this.plugin, "Telegram user session revoked.", _15sec);
+						} catch {
+							displayAndLog(
+								this.plugin,
+								"Could not revoke the Telegram session. Retry when connected.",
+								_15sec,
+							);
+						}
+						await this.display();
+					}),
+			)
+			.addExtraButton((button) =>
+				button
+					.setIcon("refresh-ccw")
+					.setTooltip("Reconnect")
+					.setDisabled(!hasSession || this.plugin.userConnected || this.plugin.checkingUserConnection)
+					.onClick(async () => {
+						const error = await User.connect(this.plugin);
+						if (error) displayAndLog(this.plugin, error, _15sec);
+						await this.display();
+					}),
+			);
 	}
 
 	addAdvancedSettings() {
-		new Setting(this.containerEl).addButton((btn: ButtonComponent) => {
-			btn.setButtonText("Advanced settings");
-			btn.setClass("mod-cta");
-			btn.onClick(async () => {
-				const advancedSettingsModal = new AdvancedSettingsModal(this.plugin);
-				advancedSettingsModal.open();
-			});
-		});
+		new Setting(this.containerEl).addButton((button) =>
+			button.setButtonText("Advanced settings").onClick(() => new AdvancedSettingsModal(this.plugin).open()),
+		);
 	}
 
 	async addMessageDistributionRules() {
@@ -403,39 +369,14 @@ export class TelegramSyncSettingTab extends PluginSettingTab {
 			});
 	}
 
-	async storeTopicName(msg: TelegramBot.Message) {
-		const bot = this.plugin.bot;
-		if (!bot || !msg.text) return;
-
+	async storeTopicName(msg: Message, name: string) {
 		const topicId = getTopicId(msg);
-		if (topicId) {
-			const topicName = msg.text.substring(11);
-			if (!topicName) throw new Error("Set topic name! example: /topicName NewTopicName");
-			const newTopic: Topic = {
-				name: topicName,
-				chatId: msg.chat.id,
-				topicId: topicId,
-			};
-			const topicNameIndex = this.plugin.settings.topicNames.findIndex(
-				(tn) => tn.topicId == newTopic.topicId && tn.chatId == newTopic.chatId,
-			);
-			if (topicNameIndex > -1) {
-				this.plugin.settings.topicNames[topicNameIndex].name = newTopic.name;
-			} else this.plugin.settings.topicNames.push(newTopic);
-			await this.plugin.saveSettings();
-
-			const progressBarMessage = await createProgressBar(bot, msg, ProgressBarType.STORED);
-
-			// Update the progress bar during the delay
-			let stage = 0;
-			for (let i = 1; i <= 10; i++) {
-				await new Promise((resolve) => setTimeout(resolve, 50)); // 50 ms delay between updates
-				stage = await updateProgressBar(bot, msg, progressBarMessage, 10, i, stage);
-			}
-			await bot.deleteMessage(msg.chat.id, msg.message_id);
-			await deleteProgressBar(bot, msg, progressBarMessage);
-		} else {
-			throw new Error("You can set the topic name only by sending the command to the topic!");
-		}
+		if (!topicId || !name) return;
+		const existing = this.plugin.settings.topicNames.find(
+			(topic) => topic.chatId === msg.chat.id && topic.topicId === topicId,
+		);
+		if (existing) existing.name = name;
+		else this.plugin.settings.topicNames.push({ name, chatId: msg.chat.id, topicId });
+		await this.plugin.saveSettings();
 	}
 }

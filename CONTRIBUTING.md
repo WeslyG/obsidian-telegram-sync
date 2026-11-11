@@ -12,11 +12,11 @@ I'm thrilled you're considering making a contribution to my project! The process
 
 2. **Clone the Repository**: In your new fork, click the "Code" button and copy the URL. Then, open your terminal and run the command `git clone [URL]`.
 
-3. **Create a New Branch** from `main` and install dependencies with `npm ci` using Node.js 24.
+3. **Create a New Branch** from `main` and install dependencies with `npm ci --ignore-scripts` using Node.js 24. The project disables dependency lifecycle scripts. CI validates registry tarballs and integrity hashes, checks npm advisories, and verifies npm registry signatures.
 
 4. **Make Your Changes**: Now's the time to contribute your changes to the project. Once you're finished, add your changes with `git add .`.
 
-5. **Run the checks** with `npm run check`. Use `npm run build` to also generate the Obsidian bundle. To try a development build in a test vault, run `npm run test:install -- <vault-path>`.
+5. **Run the checks** with `npm run check`. Use `npm run build` to also generate the Obsidian bundle. To try a development build in an initialized test vault, run `npm run test:install -- <vault-path>`. The installer copies the three plugin files and has no network step.
 
 6. **Commit Your Changes**: Commit your changes with `git commit -m "[commit-message]"`.
 
@@ -44,6 +44,6 @@ Thank you for being part of this journey! Your contributions are what keep the p
 
 ## Publishing a release
 
-1. Run `npm version minor --no-git-tag-version` (or `patch` or `major` as appropriate). Commit the resulting changes to `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` when the minimum Obsidian version changes.
+1. Run `npm version minor --no-git-tag-version` (or `patch` or `major` as appropriate), then `npm run version:sync`. Commit the changes to `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` when the minimum Obsidian version changes.
 2. When the release commit is at the tip of `main`, tag it with the exact manifest version, for example `git tag 4.1.0 <commit>`. Push it with `git push origin 4.1.0`.
 3. In [Actions → Release](https://github.com/WeslyG/obsidian-telegram-sync/actions/workflows/release.yml), select **Run workflow**, choose `main`, and enter the tag without a `v` prefix. The workflow verifies that the tag points to the `main` commit selected for the run, then builds and publishes `main.js`, `manifest.json`, and `styles.css`.

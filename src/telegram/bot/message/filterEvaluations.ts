@@ -1,106 +1,76 @@
-import TelegramBot from "node-telegram-bot-api";
-import { MessageDistributionRule, MessageFilterCondition, ConditionType } from "src/settings/messageDistribution";
+import type { Message } from "src/telegram/bot/apiTypes";
+import {
+	ConditionOperation,
+	ConditionType,
+	MessageDistributionRule,
+	MessageFilterCondition,
+} from "src/settings/messageDistribution";
 import { getForwardFromName, getTopic } from "./getters";
-import TelegramSyncPlugin from "src/main";
+import type TelegramSyncPlugin from "src/main";
 import * as Client from "src/telegram/user/client";
 
-function isUserFiltered(msg: TelegramBot.Message, userNameOrId: string): boolean {
-	if (!msg?.from || !userNameOrId) return false;
-
-	const user = msg.from;
-	const fullName = `${user.first_name} ${user.last_name || ""}`.trim();
-	const userId = user.id < 0 ? user.id.toString().slice(4) : user.id.toString();
-
-	return [user.username, userId, fullName].includes(userNameOrId);
-}
-
-function isChatFiltered(msg: TelegramBot.Message, chatNameOrId: string): boolean {
-	if (!msg?.chat || !chatNameOrId) return false;
-
-	const chat = msg.chat;
-	const chatId = chat.id < 0 ? chat.id.toString().slice(4) : chat.id.toString();
-
-	let chatName = "";
-	if (chat.type == "private") {
-		chatName = `${chat.first_name} ${chat.last_name || ""}`.trim();
-	} else {
-		chatName = chat.title || chatId;
-	}
-
-	return [chatId, chatName].includes(chatNameOrId);
-}
-
-function isForwardFromFiltered(msg: TelegramBot.Message, forwardFromName: string): boolean {
-	return forwardFromName == getForwardFromName(msg);
-}
-
-export async function isTopicFiltered(
-	plugin: TelegramSyncPlugin,
-	msg: TelegramBot.Message,
-	topicName: string,
-): Promise<boolean> {
-	const topic = await getTopic(plugin, msg, false);
-	if (!topic) return false;
-	return topicName == topic.name;
-}
-
-export async function isContentFiltered(msg: TelegramBot.Message, substring: string): Promise<boolean> {
-	return (msg.text || msg.caption || "").contains(substring);
-}
-
-export async function isVoiceTranscriptFiltered(
-	plugin: TelegramSyncPlugin,
-	msg: TelegramBot.Message,
-	substring: string,
-): Promise<boolean> {
-	let voiceTranscript = "";
-	if (plugin.bot) voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
-	return voiceTranscript.contains(substring);
-}
-
-export async function isMessageFiltered(
-	plugin: TelegramSyncPlugin,
-	msg: TelegramBot.Message,
-	condition: MessageFilterCondition,
-): Promise<boolean> {
-	switch (condition.conditionType) {
-		case ConditionType.ALL:
-			return true;
-		case ConditionType.USER:
-			return isUserFiltered(msg, condition.value);
-		case ConditionType.CHAT:
-			return isChatFiltered(msg, condition.value);
+async function valuesFor(plugin: TelegramSyncPlugin, msg: Message, type: ConditionType): Promise<string[]> {
+	switch (type) {
+		case ConditionType.USER: {
+			const user = msg.from;
+			return user
+				? [user.username ?? "", String(user.id), [user.first_name, user.last_name].filter(Boolean).join(" ")]
+				: [];
+		}
+		case ConditionType.CHAT: {
+			const { chat } = msg;
+			const id = String(chat.id);
+			const channelId = id.startsWith("-100") ? id.slice(4) : id;
+			return [id, channelId, chat.title ?? [chat.first_name, chat.last_name].filter(Boolean).join(" ")];
+		}
 		case ConditionType.FORWARD_FROM:
-			return isForwardFromFiltered(msg, condition.value);
-		case ConditionType.TOPIC:
-			return await isTopicFiltered(plugin, msg, condition.value);
+			return [getForwardFromName(msg)];
+		case ConditionType.TOPIC: {
+			const topic = await getTopic(plugin, msg, false);
+			return topic ? [topic.name] : [];
+		}
 		case ConditionType.CONTENT:
-			return await isContentFiltered(msg, condition.value);
+			return [msg.text ?? msg.caption ?? ""];
 		case ConditionType.VOICE_TRANSCRIPT:
-			return await isVoiceTranscriptFiltered(plugin, msg, condition.value);
+			return plugin.bot && plugin.userConnected
+				? [await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser())]
+				: [];
+		default:
+			return [];
+	}
+}
+
+async function matches(plugin: TelegramSyncPlugin, msg: Message, condition: MessageFilterCondition): Promise<boolean> {
+	if (condition.conditionType === ConditionType.ALL) return condition.operation === ConditionOperation.NO_OPERATION;
+	if (!condition.value) return false;
+	const values = await valuesFor(plugin, msg, condition.conditionType);
+	if (!values.length) return false;
+	const equal = () => values.some((value) => value === condition.value);
+	const contains = () => values.some((value) => value.includes(condition.value));
+	switch (condition.operation) {
+		case ConditionOperation.EQUAL:
+			return equal();
+		case ConditionOperation.NOT_EQUAL:
+			return !equal();
+		case ConditionOperation.CONTAIN:
+			return contains();
+		case ConditionOperation.NOT_CONTAIN:
+			return !contains();
 		default:
 			return false;
 	}
 }
 
-export async function doesMessageMatchRule(
-	plugin: TelegramSyncPlugin,
-	msg: TelegramBot.Message,
-	rule: MessageDistributionRule,
-): Promise<boolean> {
+export async function doesMessageMatchRule(plugin: TelegramSyncPlugin, msg: Message, rule: MessageDistributionRule) {
+	if (!rule.messageFilterConditions.length) return false;
 	for (const condition of rule.messageFilterConditions) {
-		const isFiltered = await isMessageFiltered(plugin, msg, condition);
-		if (!isFiltered) return false;
+		if (!(await matches(plugin, msg, condition))) return false;
 	}
 	return true;
 }
 
-export async function getMessageDistributionRule(
-	plugin: TelegramSyncPlugin,
-	msg: TelegramBot.Message,
-): Promise<MessageDistributionRule | undefined> {
+export async function getMessageDistributionRule(plugin: TelegramSyncPlugin, msg: Message) {
 	for (const rule of plugin.settings.messageDistributionRules) {
 		if (await doesMessageMatchRule(plugin, msg, rule)) return rule;
 	}
-	return undefined;
 }

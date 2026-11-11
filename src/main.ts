@@ -1,39 +1,27 @@
+import type TelegramBot from "src/telegram/bot/api";
+import type { User as BotUser } from "src/telegram/bot/apiTypes";
 import { Plugin } from "obsidian";
 import { DEFAULT_SETTINGS, TelegramSyncSettings, TelegramSyncSettingTab } from "./settings/Settings";
-import TelegramBot from "node-telegram-bot-api";
-import { machineIdSync } from "node-machine-id";
-import {
-	_15sec,
-	_2min,
-	displayAndLog,
-	StatusMessages,
-	displayAndLogError,
-	hideMTProtoAlerts,
-	_1sec,
-	_5sec,
-	_day,
-} from "./utils/logUtils";
+import { randomUUID } from "node:crypto";
+import { isBotToken } from "src/telegram/bot/api";
+import { normalizeAllowedChats } from "src/telegram/bot/access";
+import { _15sec, _2min, displayAndLog, StatusMessages, displayAndLogError, _1sec, _day } from "./utils/logUtils";
 import * as Client from "./telegram/user/client";
 import * as Bot from "./telegram/bot/bot";
 import * as User from "./telegram/user/user";
 import { enqueue } from "./utils/queues";
-import { clearTooManyRequestsInterval } from "./telegram/bot/tooManyRequests";
-import { clearCachedMessagesInterval } from "./telegram/convertors/botMessageToClientMessage";
 import { clearHandleMediaGroupInterval } from "./telegram/bot/message/handlers";
 import ConnectionStatusIndicator, { checkConnectionMessage } from "./ConnectionStatusIndicator";
 import { mainDeviceIdSettingName } from "./settings/modals/BotSettings";
 import {
 	createDefaultMessageDistributionRule,
-	createDefaultMessageFilterCondition,
+	extractConditionsFromFilterQuery,
 	defaultFileNameTemplate,
 	defaultMessageFilterQuery,
 	defaultNoteNameTemplate,
 	defaultTelegramFolder,
 } from "./settings/messageDistribution";
-import os from "os";
 import { clearCachedUnprocessedMessages, forwardUnprocessedMessages } from "./telegram/user/sync";
-import { decrypt, encrypt } from "./utils/crypto256";
-import { PinCodeModal } from "./settings/modals/PinCode";
 
 // TODO LOW: add "connecting"
 export type ConnectionStatus = "connected" | "disconnected";
@@ -50,10 +38,8 @@ export default class TelegramSyncPlugin extends Plugin {
 	checkingUserConnection = false;
 	// TODO LOW: TelegramSyncBot extends TelegramBot
 	bot?: TelegramBot;
-	botUser?: TelegramBot.User;
-	createdFilePaths: string[] = [];
-	currentDeviceId = machineIdSync(true);
-	lastPollingErrors: string[] = [];
+	botUser?: BotUser;
+	currentDeviceId = "";
 	restartingIntervalId?: ReturnType<typeof setInterval>;
 	restartingIntervalTime = _15sec;
 	messagesLeftCnt = 0;
@@ -61,11 +47,9 @@ export default class TelegramSyncPlugin extends Plugin {
 	status: PluginStatus = "loading";
 	time4processOldMessages = false;
 	processOldMessagesIntervalId?: ReturnType<typeof setInterval>;
-	pinCode?: string = undefined;
 
 	async initTelegram(initType?: Client.SessionType) {
-		this.lastPollingErrors = [];
-		this.messagesLeftCnt = 0;
+		if (this.status === "unloading" || this.status === "unloaded") return;
 		if (this.settings.mainDeviceId && this.settings.mainDeviceId !== this.currentDeviceId) {
 			this.stopTelegram();
 			displayAndLog(
@@ -78,10 +62,9 @@ export default class TelegramSyncPlugin extends Plugin {
 		// Uncomment timeout to debug if test during plugin loading
 		// await new Promise((resolve) => setTimeout(resolve, 3000));
 
-		if (!initType || initType == "user")
-			await User.connect(this, this.settings.telegramSessionType, this.settings.telegramSessionId);
-
 		if (!initType || initType == "bot") await Bot.connect(this);
+		if (!initType || initType == "user") await User.connect(this);
+		if (this.status !== "loaded") return;
 
 		// restart telegram bot or user if needed
 		if (!this.restartingIntervalId) this.setRestartTelegramInterval(this.restartingIntervalTime);
@@ -124,7 +107,7 @@ export default class TelegramSyncPlugin extends Plugin {
 				(!sessionType || sessionType == "user") &&
 				!this.userConnected &&
 				!this.checkingUserConnection &&
-				this.settings.telegramSessionType == "user"
+				User.hasSession(this)
 			) {
 				await this.initTelegram("user");
 				needRestartInterval = true;
@@ -132,23 +115,15 @@ export default class TelegramSyncPlugin extends Plugin {
 
 			if (
 				(!sessionType || sessionType == "bot") &&
-				!this.isBotConnected() &&
+				!this.bot &&
 				!this.checkingBotConnection &&
-				this.settings?.botToken
+				this.getBotToken()
 			) {
 				await this.initTelegram("bot");
 				needRestartInterval = true;
 			}
 
 			if (needRestartInterval) this.setRestartTelegramInterval(_15sec);
-			else if (this.bot && !sessionType && os.type() == "Darwin" && this.isBotConnected()) {
-				try {
-					this.botUser = await this.bot.getMe();
-				} catch {
-					this.setBotStatus("disconnected");
-					this.userConnected = false;
-				}
-			}
 		} catch {
 			this.setRestartTelegramInterval(
 				this.restartingIntervalTime < _2min ? this.restartingIntervalTime * 2 : this.restartingIntervalTime,
@@ -181,14 +156,16 @@ export default class TelegramSyncPlugin extends Plugin {
 	async onload() {
 		this.status = "loading";
 
+		const localId = this.app.loadLocalStorage("telegram-sync-device-id");
+		this.currentDeviceId = typeof localId === "string" && localId ? localId : randomUUID();
+		if (this.currentDeviceId !== localId)
+			this.app.saveLocalStorage("telegram-sync-device-id", this.currentDeviceId);
 		await this.loadSettings();
 		await this.upgradeSettings();
 
 		// Add a settings tab for this plugin
 		this.settingsTab = new TelegramSyncSettingTab(this.app, this);
 		this.addSettingTab(this.settingsTab);
-
-		hideMTProtoAlerts(this);
 		// Initialize the Telegram bot when Obsidian layout is fully loaded
 		this.app.workspace.onLayoutReady(async () => {
 			enqueue(this, this.initTelegram);
@@ -201,15 +178,14 @@ export default class TelegramSyncPlugin extends Plugin {
 	async onunload(): Promise<void> {
 		this.status = "unloading";
 		try {
-			clearTooManyRequestsInterval();
-			clearCachedMessagesInterval();
 			clearHandleMediaGroupInterval();
 			this.connectionStatusIndicator?.destroy();
 			this.connectionStatusIndicator = undefined;
+			this.settingsTab?.hide();
 			this.settingsTab = undefined;
 			this.stopTelegram();
 		} catch (e) {
-			displayAndLog(this, e, 0);
+			displayAndLogError(this, e, "", "", undefined, 0);
 		} finally {
 			this.status = "unloaded";
 			displayAndLog(this, this.status, 0);
@@ -218,7 +194,48 @@ export default class TelegramSyncPlugin extends Plugin {
 
 	// Load settings from the plugin's data
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const {
+			botToken,
+			botTokenEncrypted,
+			encryptionByPinCode,
+			telegramSessionId,
+			telegramSessionType,
+			cacheCleanupAtStartup,
+			processOtherBotsMessages,
+			betaVersion,
+			pluginVersion,
+			...stored
+		} = (await this.loadData()) ?? {};
+		this.settings = Object.assign(structuredClone(DEFAULT_SETTINGS), stored);
+		const entries = Array.isArray(this.settings.allowedChats)
+			? this.settings.allowedChats.filter((entry): entry is string => typeof entry === "string")
+			: [];
+		this.settings.allowedChats = normalizeAllowedChats(entries);
+		if (typeof botToken === "string" && !botTokenEncrypted && isBotToken(botToken) && !this.getBotToken()) {
+			this.setBotToken(botToken);
+		}
+		if (typeof telegramSessionId === "number" && /^\d+$/.test(String(telegramSessionId))) {
+			const prefixes = [`user_${telegramSessionId}_`, `bot_${telegramSessionId}_`];
+			for (const key of Object.keys(localStorage)) {
+				if (prefixes.some((prefix) => key.startsWith(prefix)) && key.includes(":"))
+					localStorage.removeItem(key);
+			}
+		}
+		if (
+			[
+				botToken,
+				botTokenEncrypted,
+				encryptionByPinCode,
+				telegramSessionId,
+				telegramSessionType,
+				cacheCleanupAtStartup,
+				processOtherBotsMessages,
+				betaVersion,
+				pluginVersion,
+			].some((value) => value !== undefined)
+		) {
+			await this.saveSettings();
+		}
 	}
 
 	// Save settings to the plugin's data
@@ -228,22 +245,25 @@ export default class TelegramSyncPlugin extends Plugin {
 
 	async upgradeSettings() {
 		let needToSaveSettings = false;
-		if (this.settings.cacheCleanupAtStartup) {
-			localStorage.removeItem("GramJs:apiCache");
-			this.settings.cacheCleanupAtStartup = false;
-			needToSaveSettings = true;
-		}
-
 		if (this.settings.messageDistributionRules.length == 0) {
 			this.settings.messageDistributionRules.push(createDefaultMessageDistributionRule());
 			needToSaveSettings = true;
 		} else {
 			// fixing incorrectly saved rules
 			this.settings.messageDistributionRules.forEach((rule) => {
-				if (!rule.messageFilterQuery || !rule.messageFilterConditions) {
-					rule.messageFilterQuery = defaultMessageFilterQuery;
-					rule.messageFilterConditions = [createDefaultMessageFilterCondition()];
-					needToSaveSettings = true;
+				try {
+					const conditions = extractConditionsFromFilterQuery(
+						rule.messageFilterQuery ?? defaultMessageFilterQuery,
+					);
+					if (JSON.stringify(rule.messageFilterConditions) !== JSON.stringify(conditions)) {
+						rule.messageFilterConditions = conditions;
+						needToSaveSettings = true;
+					}
+				} catch {
+					if (rule.messageFilterConditions?.length !== 0) {
+						rule.messageFilterConditions = [];
+						needToSaveSettings = true;
+					}
 				}
 				if (!rule.filePathTemplate && !rule.notePathTemplate && !rule.templateFilePath) {
 					rule.notePathTemplate = `${defaultTelegramFolder}/${defaultNoteNameTemplate}`;
@@ -253,15 +273,10 @@ export default class TelegramSyncPlugin extends Plugin {
 			});
 		}
 
-		if (!this.settings.botTokenEncrypted) {
-			this.botTokenEncrypt();
-			needToSaveSettings = true;
-		}
-
 		if (needToSaveSettings) await this.saveSettings();
 	}
 
-	async getBotUser(): Promise<TelegramBot.User> {
+	async getBotUser(): Promise<BotUser> {
 		this.botUser = this.botUser || (await this.bot?.getMe());
 		if (!this.botUser) throw new Error("Can't get access to bot info. Restart the Telegram Sync plugin");
 		return this.botUser;
@@ -275,33 +290,20 @@ export default class TelegramSyncPlugin extends Plugin {
 		if (this.botStatus == status && !error) return;
 
 		this.botStatus = status;
-		this.connectionStatusIndicator?.update(error);
+		this.connectionStatusIndicator?.update(error ? new Error("Telegram Bot API connection failed.") : undefined);
 
 		if (this.isBotConnected()) displayAndLog(this, StatusMessages.BOT_CONNECTED, 0);
 		else if (!error) displayAndLog(this, StatusMessages.BOT_DISCONNECTED, 0);
 		else displayAndLogError(this, error, StatusMessages.BOT_DISCONNECTED, checkConnectionMessage, undefined, 0);
 	}
 
-	async getBotToken(): Promise<string> {
-		if (!this.settings.botTokenEncrypted) return this.settings.botToken;
-
-		if (this.settings.encryptionByPinCode && !this.pinCode) {
-			await new Promise((resolve) => {
-				const pinCodeModal = new PinCodeModal(this, true);
-				pinCodeModal.onClose = async () => {
-					if (!this.pinCode) displayAndLog(this, "Plugin Telegram Sync stopped. No pin code entered.");
-					resolve(undefined);
-				};
-				pinCodeModal.open();
-			});
-		}
-		return decrypt(this.settings.botToken, this.pinCode);
+	getBotToken(): string {
+		const token = this.app.secretStorage?.getSecret("telegram-sync-bot-token") ?? "";
+		return isBotToken(token) ? token : "";
 	}
 
-	botTokenEncrypt(saveSettings = false) {
-		this.settings.botToken = encrypt(this.settings.botToken, this.pinCode);
-		this.settings.botTokenEncrypted = true;
-		if (saveSettings) this.saveSettings();
-		displayAndLog(this, "Bot token encrypted", 0);
+	setBotToken(token: string) {
+		if (token && !isBotToken(token)) throw new Error("Invalid Telegram bot token format.");
+		this.app.secretStorage.setSecret("telegram-sync-bot-token", token);
 	}
 }

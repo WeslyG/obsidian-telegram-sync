@@ -1,7 +1,3 @@
-import bigInt from "big-integer";
-import { Api } from "telegram";
-import { Buffer } from "buffer";
-
 const WEB_LOCATION_FLAG = 1 << 24; // substitute with actual value
 const FILE_REFERENCE_FLAG = 1 << 25; // substitute with actual value
 
@@ -26,111 +22,8 @@ enum FileType {
 	DOCUMENT_AS_FILE = 17,
 }
 
-// Photo-like file ids are longer and contain extra info, the rest are all documents
-const PHOTO_TYPES = new Set([
-	FileType.THUMBNAIL,
-	FileType.CHAT_PHOTO,
-	FileType.PHOTO,
-	FileType.WALLPAPER,
-	FileType.ENCRYPTED_THUMBNAIL,
-]);
-
-const DOCUMENT_TYPES = new Set(Object.values(FileType));
-
-for (const item of PHOTO_TYPES) {
-	DOCUMENT_TYPES.delete(item);
-}
-
-// converting Telegram Bot Api file_id to Telegram Client Api media object
-export function convertBotFileToMessageMedia(fileId: string, fileSize: number): Api.TypeMessageMedia {
-	const decoded = rle_decode(b64_decode(fileId));
-	const major = decoded[decoded.length - 1];
-	const buffer = major < 4 ? decoded.slice(0, -1) : decoded.slice(0, -2);
-
-	let bufferPosition = 0;
-	let fileType = buffer.readInt32LE(bufferPosition);
-	bufferPosition += 4;
-	const dcId = buffer.readInt32LE(bufferPosition);
-	bufferPosition += 4;
-
-	const hasWebLocation = Boolean(fileType & WEB_LOCATION_FLAG);
-	const hasFileReference = Boolean(fileType & FILE_REFERENCE_FLAG);
-
-	fileType &= ~WEB_LOCATION_FLAG;
-	fileType &= ~FILE_REFERENCE_FLAG;
-
-	if (!(fileType in FileType)) {
-		throw new Error(`Unknown file_type ${fileType} of file_id ${fileId}`);
-	}
-
-	if (hasWebLocation) {
-		const { result: url, newPosition } = readString(buffer, bufferPosition);
-		bufferPosition = newPosition;
-
-		const accessHash = buffer.readBigInt64LE(bufferPosition);
-		bufferPosition += 8;
-
-		// Fake type to return url
-		const webpage = new Api.WebPage({
-			id: bigInt(accessHash),
-			hash: Number(accessHash.toString),
-			url: url,
-			displayUrl: url,
-			attributes: [],
-		});
-
-		return new Api.MessageMediaWebPage({
-			webpage: webpage,
-		});
-	}
-
-	let fileReference: Buffer;
-	if (hasFileReference) {
-		const { result, newPosition } = readBytes(buffer, bufferPosition);
-		fileReference = result;
-		bufferPosition = newPosition;
-	} else {
-		fileReference = Buffer.alloc(0);
-	}
-
-	const media_id = BigInt(buffer.readBigInt64LE(bufferPosition).toString());
-	bufferPosition += 8;
-	const access_hash = BigInt(buffer.readBigInt64LE(bufferPosition).toString());
-	bufferPosition += 8;
-
-	if (PHOTO_TYPES.has(fileType)) {
-		const photo = new Api.Photo({
-			id: bigInt(media_id),
-			accessHash: bigInt(access_hash),
-			fileReference: fileReference,
-			dcId: dcId,
-			date: 0,
-			sizes: [],
-		});
-
-		return new Api.MessageMediaPhoto({
-			photo: photo,
-		});
-	}
-
-	const document = new Api.Document({
-		id: bigInt(media_id),
-		accessHash: bigInt(access_hash),
-		mimeType: "",
-		date: 0,
-		size: bigInt(fileSize),
-		dcId: dcId,
-		fileReference: fileReference,
-		attributes: [],
-	});
-
-	return new Api.MessageMediaDocument({
-		document: document,
-	});
-}
-
-// converting Telegram Bot Api file_id to Telegram Client Api media object
 export function extractMediaId(fileId: string): string {
+	if (fileId.length > 4096) throw new Error("Invalid Telegram file identifier.");
 	const decoded = rle_decode(b64_decode(fileId));
 	const major = decoded[decoded.length - 1];
 	const buffer = major < 4 ? decoded.slice(0, -1) : decoded.slice(0, -2);
@@ -147,7 +40,7 @@ export function extractMediaId(fileId: string): string {
 	fileType &= ~FILE_REFERENCE_FLAG;
 
 	if (!(fileType in FileType)) {
-		throw new Error(`Unknown file_type ${fileType} of file_id ${fileId}`);
+		throw new Error("Unsupported Telegram file type.");
 	}
 
 	if (hasFileReference) {
@@ -203,11 +96,6 @@ function readBytes(buffer: Buffer, position: number): { result: Buffer; newPosit
 	const result = buffer.slice(position, position + length);
 	position += length + padding;
 	return { result, newPosition: position };
-}
-
-function readString(buffer: Buffer, position: number): { result: string; newPosition: number } {
-	const { result, newPosition } = readBytes(buffer, position);
-	return { result: result.toString("utf8"), newPosition };
 }
 
 function mod(n: number, m: number): number {

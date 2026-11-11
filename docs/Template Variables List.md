@@ -66,9 +66,10 @@
 {{files:links}} - links to files | images []()
 {{voiceTranscript}} - transcribing voice (video notes!) to text (same limits as for Telegram Premium subscribers)
 {{url1}} - first url from the message
-{{url1:previewYYY}} - first url preview with YYY pixels height (default 250)
 {{replace:TEXT=>WITH}} - replace or delete text in resulting note (\n - new line)
 ```
+
+Older `url1:preview` templates now render a plain link. Incoming messages are treated as data and cannot introduce template directives, raw HTML, or Markdown embeds.
 
 #### Note content template example:
 

@@ -34,41 +34,42 @@ export function sanitizeFileName(fileName: string): string {
 }
 
 export function sanitizeFilePath(filePath: string): string {
+	const segments = filePath.split(/[\\/]/);
+	if (
+		path.posix.isAbsolute(filePath) ||
+		path.win32.isAbsolute(filePath) ||
+		segments.some((part) => part.trimStart().startsWith("."))
+	) {
+		throw new Error("Telegram output paths must stay in visible folders inside the vault.");
+	}
 	const invalidCharacters = /[\\:*?"<>|\n\r]/g;
 	return normalizePath(truncatePathComponents(filePath.replace(invalidCharacters, "_")));
 }
 
 export async function getUniqueFilePath(
 	vault: Vault,
-	createdFilePaths: string[],
 	initialFilePath: string,
 	date: Date,
 	fileExtension: string,
 ): Promise<string> {
-	let fileFolderPath = path.dirname(initialFilePath);
+	let fileFolderPath = path.posix.dirname(initialFilePath);
 	if (fileFolderPath != ".") await createFolderIfNotExist(vault, fileFolderPath);
 	else fileFolderPath = "";
 
 	let filePath = initialFilePath;
-	if (!(vault.getAbstractFileByPath(filePath) instanceof TFile)) return filePath;
+	if (!vault.getAbstractFileByPath(filePath)) return filePath;
 
-	const initialFileName = path.basename(filePath, "." + fileExtension);
+	const initialFileName = path.posix.basename(filePath, "." + fileExtension);
 	const dateString = date2DateString(date);
 	let fileId = Number(date2TimeString(date));
 	const collectFileName = () => `${initialFileName} - ${dateString}${fileId}.${fileExtension}`;
 	let fileName = collectFileName();
 
-	let previousFilePath = "";
-	while (
-		previousFilePath != filePath &&
-		(createdFilePaths.includes(filePath) || vault.getAbstractFileByPath(filePath) instanceof TFile)
-	) {
-		previousFilePath = filePath;
+	while (vault.getAbstractFileByPath(filePath)) {
 		fileId += 1;
 		fileName = collectFileName();
 		filePath = fileFolderPath ? `${fileFolderPath}/${fileName}` : fileName;
 	}
-	createdFilePaths.push(filePath);
 	return filePath;
 }
 
@@ -102,12 +103,8 @@ export async function appendContentToNote(
 	else if (currentContent != content) await vault.modify(noteFile, content);
 }
 
-export function base64ToString(base64: string): string {
-	return Buffer.from(base64, "base64").toString("utf-8");
-}
-
 function truncatePathComponents(filePath: string, maxLength = 200): string {
-	const parsedPath = path.parse(filePath);
+	const parsedPath = path.posix.parse(filePath);
 
 	// Split the path into its components (folders, subfolders, etc.)
 	const pathComponents = parsedPath.dir.split("/");
@@ -122,7 +119,7 @@ function truncatePathComponents(filePath: string, maxLength = 200): string {
 		parsedPath.name.length > maxLength ? parsedPath.name.substring(0, maxLength) : parsedPath.name;
 
 	// Reassemble the full path
-	const truncatedPath = path.join(...truncatedComponents, truncatedFileName + parsedPath.ext);
+	const truncatedPath = path.posix.join(...truncatedComponents, truncatedFileName + parsedPath.ext);
 
 	return truncatedPath;
 }
@@ -130,5 +127,7 @@ function truncatePathComponents(filePath: string, maxLength = 200): string {
 export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 	const { buffer, byteOffset, byteLength } = bytes;
 	if (!(buffer instanceof ArrayBuffer)) return Uint8Array.from(bytes).buffer;
-	return byteOffset === 0 && byteLength === buffer.byteLength ? buffer : buffer.slice(byteOffset, byteOffset + byteLength);
+	return byteOffset === 0 && byteLength === buffer.byteLength
+		? buffer
+		: buffer.slice(byteOffset, byteOffset + byteLength);
 }

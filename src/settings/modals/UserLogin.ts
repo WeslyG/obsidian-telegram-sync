@@ -1,107 +1,78 @@
 import { Modal, Setting } from "obsidian";
-import TelegramSyncPlugin from "src/main";
+import type TelegramSyncPlugin from "src/main";
 import * as User from "src/telegram/user/user";
 
 export class UserLogInModal extends Modal {
-	userLoginDiv: HTMLDivElement;
-	qrCodeContainer: HTMLDivElement;
-	password = "";
-	constructor(public plugin: TelegramSyncPlugin) {
+	private controller = new AbortController();
+
+	constructor(private plugin: TelegramSyncPlugin) {
 		super(plugin.app);
 	}
 
-	async display() {
-		this.addHeader();
-		this.addPassword();
-		this.addScanner();
-		await this.addQrCode();
-		this.addCheck();
-		this.addFooterButtons();
-	}
+	onOpen() {
+		this.titleEl.setText("Connect a Telegram user");
+		const info = this.contentEl.createDiv({
+			text: "This feature connects directly to Telegram. Create an API ID and hash at ",
+		});
+		info.createEl("a", { href: "https://my.telegram.org/apps", text: "my.telegram.org" });
+		let apiId = "";
+		let apiHash = "";
+		let password = "";
+		let passwordInput: HTMLInputElement | undefined;
 
-	addHeader() {
-		this.contentEl.empty();
-		this.userLoginDiv = this.contentEl.createDiv();
-		this.titleEl.setText("User authorization");
-	}
-
-	addPassword() {
-		new Setting(this.userLoginDiv)
-			.setName("1. Enter password (optionally)")
-			.setDesc(
-				"Enter your password before scanning QR code only if you use two-step authorization. Password will not be stored",
-			)
-			.addText((text) => {
-				text.setPlaceholder("*************")
-					.setValue("")
-					.onChange(async (value: string) => {
-						this.password = value;
-					});
+		new Setting(this.contentEl).setName("API ID").addText((text) =>
+			text.onChange((value) => {
+				apiId = value.trim();
+			}),
+		);
+		new Setting(this.contentEl).setName("API hash").addText((text) => {
+			text.inputEl.type = "password";
+			text.onChange((value) => {
+				apiHash = value.trim();
 			});
-	}
-
-	addScanner() {
-		new Setting(this.userLoginDiv)
-			.setName("2. Prepare QR code scanner")
-			.setDesc("Open Telegram on your phone. Go to Settings > Devices > Link Desktop Device");
-	}
-
-	async addQrCode() {
-		new Setting(this.userLoginDiv)
-			.setName("3. Generate & scan QR code")
-			.setDesc(`Generate QR code and point your phone at it to confirm login`)
-			.addButton((b) => {
-				b.setButtonText("Generate QR code");
-				b.onClick(async () => {
-					await this.showQrCodeGeneratingState("🔵 QR code generating...\n", "#007BFF");
-					const error = await User.connect(
-						this.plugin,
-						"user",
-						undefined,
-						this.qrCodeContainer,
-						this.password,
-					);
-					if (error) await this.showQrCodeGeneratingState(`🔴 ${error}\n`, "#FF0000");
-					else await this.showQrCodeGeneratingState("🟢 Successfully logged in!\n", "#008000");
+		});
+		new Setting(this.contentEl)
+			.setName("Telegram two-step password")
+			.setDesc("Enter it only if enabled on your Telegram account.")
+			.addText((text) => {
+				text.inputEl.type = "password";
+				passwordInput = text.inputEl;
+				text.onChange((value) => {
+					password = value;
 				});
 			});
-		this.qrCodeContainer = this.userLoginDiv.createDiv({
-			cls: "qr-code-container",
-		});
+
+		this.contentEl.createEl("p", { text: "In Telegram, open Settings → Devices → Link Desktop Device." });
+		const container = this.contentEl.createDiv({ cls: "qr-code-container" });
+		new Setting(this.contentEl).addButton((button) =>
+			button
+				.setButtonText("Generate QR code")
+				.setCta()
+				.onClick(async () => {
+					button.setDisabled(true);
+					container.setText("Connecting to Telegram…");
+					const error = await User.connect(this.plugin, {
+						apiId: Number(apiId),
+						apiHash,
+						password,
+						container,
+						signal: this.controller.signal,
+					});
+					password = "";
+					if (passwordInput) passwordInput.value = "";
+					if (this.controller.signal.aborted) return;
+					if (!error) {
+						this.close();
+						return;
+					}
+					container.setText(error);
+					button.setDisabled(false);
+				}),
+		);
 	}
 
-	addCheck() {
-		new Setting(this.userLoginDiv)
-			.setName("4. Check active sessions")
-			.setDesc(
-				`If the login is successful, you will find the 'Obsidian Telegram Sync' session in the list of active sessions. If you find it in the list of inactive sessions, then you have probably entered the wrong password`,
-			);
-	}
-	addFooterButtons() {
-		this.userLoginDiv.createEl("br");
-		const footerButtons = new Setting(this.contentEl.createDiv());
-		footerButtons.addButton((b) => {
-			b.setIcon("checkmark");
-			b.setButtonText("ok");
-			b.onClick(async () => this.close());
-		});
-	}
-
-	async onOpen() {
-		await this.display();
-	}
-
-	cleanQrContainer() {
-		while (this.qrCodeContainer.firstChild) {
-			this.qrCodeContainer.removeChild(this.qrCodeContainer.firstChild);
-		}
-	}
-
-	async showQrCodeGeneratingState(text: string, color?: string) {
-		this.cleanQrContainer();
-		const message = this.qrCodeContainer.createEl("pre", { text });
-		if (color) message.style.color = color;
-		message.style.fontWeight = "bold";
-		message.style.whiteSpace = "pre-wrap";
+	onClose() {
+		this.controller.abort();
+		this.contentEl.empty();
 	}
 }

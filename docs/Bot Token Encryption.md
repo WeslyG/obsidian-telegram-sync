@@ -1,30 +1,11 @@
-#### PIN Code Bot Token Encryption
+# Bot token storage
 
-##### What type of encryption does the plugin use?
+Telegram Sync stores bot tokens in Obsidian's per-vault secret storage. This requires Obsidian 1.11.4 or later. The token stays out of the plugin's `data.json`. Enter it on each device that runs the plugin.
 
-The plugin uses AES-256 encryption to store the bot token securely. By default, the token is encrypted and saved locally on your device. However, since the plugin is open-source, the encryption key is embedded in the code, making it theoretically possible for other plugins to access the encrypted token.
+The token is used only for HTTPS requests to the Telegram Bot API, including attachment downloads. A configured bot proxy carries those requests. The optional Telegram account login uses its own API ID and hash.
 
-##### What additional protection does the PIN code provide?
+## Upgrading an older installation
 
-Enabling PIN-based encryption means that the decryption process requires a user-defined PIN, which is not stored. The PIN exists only in the user’s memory, preventing other plugins from accessing it. This extra layer ensures that even if the encryption mechanism is known through the source code, only someone with the correct PIN can decrypt the bot token.
+A valid legacy plaintext token moves to secret storage. Legacy encrypted values are removed from current settings and require token re-entry. The old encryption key shipped in the plugin. If a legacy settings copy was shared or synced to a location you do not trust, rotate the bot token in BotFather and enter the new token in Telegram Sync.
 
-##### What risks does this encryption help prevent?
-
--   **Misuse of Bot Token**: Prevents scenarios where a malicious plugin could extract the token and use it for unauthorized actions, such as sending spam or other undesired activities through your bot.
--   **Bot Suspension**: Misuse of your bot token could lead to temporary or permanent suspension of your bot, making it unable to create new bots or send messages for a period (e.g., up to a month).
-
-##### How does it work?
-
-When this feature is enabled, you will be prompted to enter your PIN each time Obsidian starts. This PIN is used to decrypt the bot token for the session, keeping the token secure while stored on your device.
-
-##### What to do if you forget your PIN?
-
-If you forget your PIN, you will need to reset the encryption by re-entering your bot token in unencrypted form:
-
-1. Open the plugin settings in Obsidian.
-2. Enter your bot token without encryption.
-3. Re-enable the encryption feature and set a new PIN.
-
-##### Why is this important?
-
-Given the open-source nature of the plugin, adding a user-defined PIN helps ensure that your bot token remains under your control, even if other plugins attempt to access it. This feature is crucial for maintaining the integrity of your bot and avoiding unintended suspensions or breaches.
+The main device ID is now generated locally for each vault. If you previously selected a main device, open **Bot settings → Main device id** on the intended device and select **Use this device**. Old account sessions need a fresh login. Revoke the previous session in Telegram's **Settings → Devices**.

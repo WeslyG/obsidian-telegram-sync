@@ -1,11 +1,36 @@
-import TelegramBot from "node-telegram-bot-api";
+import type { Attachment, Message, User } from "src/telegram/bot/apiTypes";
 import { linkifyit } from "linkify-it";
 import TelegramSyncPlugin from "src/main";
 import { Topic } from "src/settings/Settings";
+import { markdownWebLink, safeWebUrl } from "./markdownSafety";
 
-const fileTypes = ["photo", "video", "voice", "document", "audio", "video_note"];
+const fileTypes = ["photo", "video", "voice", "document", "audio", "video_note"] as const;
+const linkify = linkifyit();
 
-export function getForwardFromName(msg: TelegramBot.Message): string {
+export function normalizeForwardOrigin(msg: Message) {
+	const origin = msg.forward_origin;
+	if (!origin) return;
+	msg.forward_date = origin.date;
+	switch (origin.type) {
+		case "user":
+			msg.forward_from = origin.sender_user;
+			break;
+		case "hidden_user":
+			msg.forward_sender_name = origin.sender_user_name;
+			break;
+		case "chat":
+			msg.forward_from_chat = origin.sender_chat;
+			msg.forward_signature = origin.author_signature;
+			break;
+		case "channel":
+			msg.forward_from_chat = origin.chat;
+			msg.forward_from_message_id = origin.message_id;
+			msg.forward_signature = origin.author_signature;
+			break;
+	}
+}
+
+export function getForwardFromName(msg: Message): string {
 	let forwardFromName = "";
 
 	if (msg.forward_from || msg.forward_from_chat || msg.forward_sender_name || msg.from) {
@@ -27,7 +52,7 @@ export function getForwardFromName(msg: TelegramBot.Message): string {
 	return forwardFromName;
 }
 
-export function getForwardFromLink(msg: TelegramBot.Message): string {
+export function getForwardFromLink(msg: Message): string {
 	let forwardFromLink = "";
 	// TODO if msg.from then created by not forwarded from
 	if (msg.forward_from || msg.forward_from_chat || msg.forward_sender_name || msg.from) {
@@ -53,21 +78,21 @@ export function getForwardFromLink(msg: TelegramBot.Message): string {
 			const from_id = msg.from.id < 0 ? msg.from.id.toString().slice(4) : msg.from.id.toString();
 			username = msg.from.username || "no_username_" + from_id;
 		}
-		forwardFromLink = `[${forwardFromName}](https://t.me/${username})`;
+		forwardFromLink = markdownWebLink(forwardFromName, `https://t.me/${username}`);
 	}
 
 	return forwardFromLink;
 }
 
-export function getUserLink(msg: TelegramBot.Message): string {
+export function getUserLink(msg: Message): string {
 	if (!msg.from) return "";
 	const from_id = msg.from.id < 0 ? msg.from.id.toString().slice(4) : msg.from.id.toString();
 	const username = msg.from.username || "no_username_" + from_id;
 	const fullName = `${msg.from.first_name} ${msg.from.last_name || ""}`.trim();
-	return `[${fullName}](https://t.me/${username})`;
+	return markdownWebLink(fullName, `https://t.me/${username}`);
 }
 
-export function getChatName(msg: TelegramBot.Message, botUser?: TelegramBot.User): string {
+export function getChatName(msg: Message, botUser?: User): string {
 	let chatName = "";
 	if (botUser?.username && msg.chat.id == msg.from?.id) {
 		chatName = `${botUser.first_name} ${botUser.last_name || ""}`.trim() || botUser.username;
@@ -79,7 +104,7 @@ export function getChatName(msg: TelegramBot.Message, botUser?: TelegramBot.User
 	return chatName;
 }
 
-export function getChatId(msg: TelegramBot.Message, botUser?: TelegramBot.User): string {
+export function getChatId(msg: Message, botUser?: User): string {
 	let chatId = "";
 	if (botUser?.username && msg.chat.id == msg.from?.id) {
 		chatId = botUser.id.toString();
@@ -89,7 +114,7 @@ export function getChatId(msg: TelegramBot.Message, botUser?: TelegramBot.User):
 	return chatId;
 }
 
-export function getChatLink(msg: TelegramBot.Message, botUser?: TelegramBot.User): string {
+export function getChatLink(msg: Message, botUser?: User): string {
 	let userName = "";
 	if (botUser?.username && msg.chat.id == msg.from?.id) {
 		userName = botUser?.username;
@@ -105,20 +130,19 @@ export function getChatLink(msg: TelegramBot.Message, botUser?: TelegramBot.User
 		userName = userName.replace(/\/\//g, "/"); // because threadId can be empty
 	}
 	const chatName = getChatName(msg, botUser);
-	const chatLink = `[${chatName}](https://t.me/${userName})`;
+	const chatLink = markdownWebLink(chatName, `https://t.me/${userName}`);
 	return chatLink;
 }
 
-export function getUrl(msg: TelegramBot.Message, num = 1, lookInCaptions = true): string {
+export function getUrl(msg: Message, num = 1, lookInCaptions = true): string {
 	const text = (msg.text || "") + (lookInCaptions && msg.caption ? msg.caption : "");
 	if (!text) return "";
 
-	const linkify = linkifyit();
 	const matches = linkify.match(text);
-	return matches ? matches[num - 1].url : "";
+	return safeWebUrl(matches?.[num - 1]?.url ?? "");
 }
 
-export function getHashtag(msg: TelegramBot.Message, num = 1, lookInCaptions = true): string {
+export function getHashtag(msg: Message, num = 1, lookInCaptions = true): string {
 	const text = (msg.text || "") + (lookInCaptions && msg.caption ? msg.caption : "");
 	if (!text) return "";
 
@@ -126,26 +150,26 @@ export function getHashtag(msg: TelegramBot.Message, num = 1, lookInCaptions = t
 	return hashtags[num - 1]?.replace("#", "") || "";
 }
 
-export function getInlineUrls(msg: TelegramBot.Message): string {
+export function getInlineUrls(msg: Message): string {
 	let urls = "";
 	if (!msg.reply_markup?.inline_keyboard || msg.reply_markup.inline_keyboard.length == 0) return "";
 	msg.reply_markup.inline_keyboard.forEach((buttonsGroup) => {
 		buttonsGroup.forEach((button) => {
-			if (button.url) {
-				urls += `[${button.text}](${button.url})\n`;
+			if (button.url && safeWebUrl(button.url)) {
+				urls += markdownWebLink(button.text, button.url) + "\n";
 			}
 		});
 	});
 	return urls.trimEnd();
 }
 
-export function getTopicId(msg: TelegramBot.Message): number | undefined {
+export function getTopicId(msg: Message): number | undefined {
 	return (msg.chat.is_forum && (msg.message_thread_id || msg.reply_to_message?.message_thread_id || 1)) || undefined;
 }
 
 export async function getTopic(
 	plugin: TelegramSyncPlugin,
-	msg: TelegramBot.Message,
+	msg: Message,
 	throwError = true,
 ): Promise<Topic | undefined> {
 	if (!msg.chat.is_forum) return undefined;
@@ -170,16 +194,14 @@ export async function getTopic(
 	return topic;
 }
 
-export async function getTopicLink(plugin: TelegramSyncPlugin, msg: TelegramBot.Message): Promise<string> {
-	if (!msg.chat.is_forum) return "";
-	const topic = await getTopic(plugin, msg);
+export function getTopicLink(msg: Message, topic?: Topic): string {
 	if (!topic) return "";
 	const chatId = topic.chatId < 0 ? topic.chatId.toString().slice(4) : topic.chatId.toString();
 	const path = (msg.chat.username || `c/${chatId}`) + `/${topic.topicId}`;
-	return `[${topic.name}](https://t.me/${path})`;
+	return markdownWebLink(topic.name, `https://t.me/${path}`);
 }
 
-export function getReplyMessageId(msg: TelegramBot.Message): string {
+export function getReplyMessageId(msg: Message): string {
 	const reply = msg.reply_to_message;
 	if (reply && reply.message_thread_id != reply.message_id) {
 		return reply.message_id.toString();
@@ -187,14 +209,10 @@ export function getReplyMessageId(msg: TelegramBot.Message): string {
 	return "";
 }
 
-// oxlint-disable-next-line typescript/no-explicit-any
-export function getFileObject(msg: TelegramBot.Message): { fileType: string; fileObject?: any } {
+export function getFileObject(msg: Message): { fileType: string; fileObject?: Attachment | Attachment[] } {
 	for (const fileType of fileTypes) {
-		// oxlint-disable-next-line typescript/no-explicit-any
-		if ((msg as any)[fileType]) {
-			// oxlint-disable-next-line typescript/no-explicit-any
-			return { fileType: fileType, fileObject: (msg as any)[fileType] };
-		}
+		const fileObject = msg[fileType];
+		if (fileObject) return { fileType, fileObject };
 	}
 	return { fileType: "undefined", fileObject: undefined };
 }

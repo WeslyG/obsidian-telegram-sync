@@ -1,45 +1,26 @@
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 import manifest from "./manifest.json" with { type: "json" };
-import https from "https";
 
-const destinationFolder = process.argv[2];
+const destination = process.argv[2];
+if (!destination) throw new Error("Provide the path to an initialized Obsidian test vault.");
 
-if (!destinationFolder) {
-	console.error("Please provide path to Obsidian Vault");
-	process.exit(1);
+const vault = fs.realpathSync(destination);
+const config = path.join(vault, ".obsidian");
+if (!fs.lstatSync(config).isDirectory()) throw new Error("Use an initialized Obsidian test vault.");
+const plugins = path.join(config, "plugins");
+const plugin = path.join(plugins, manifest.id);
+
+for (const directory of [plugins, plugin]) {
+	if (!fs.existsSync(directory)) fs.mkdirSync(directory);
+	if (!fs.lstatSync(directory).isDirectory()) throw new Error("Plugin directories must be inside the test vault.");
 }
 
-const pluginsFolder = path.join(destinationFolder, ".obsidian", "plugins");
-const thisPluginFolder = path.join(pluginsFolder, manifest.id);
-
-if (!fs.existsSync(thisPluginFolder)) {
-	fs.mkdirSync(thisPluginFolder, { recursive: true });
+const files = ["main.js", "styles.css", "manifest.json"];
+for (const file of files) {
+	if (!fs.lstatSync(file).isFile()) throw new Error(`Missing build file ${file}.`);
+	const existing = fs.lstatSync(path.join(plugin, file), { throwIfNoEntry: false });
+	if (existing && !existing.isFile()) throw new Error(`Refusing to overwrite ${file}.`);
 }
-
-const filesToCopy = ["main.js", "styles.css", "manifest.json"];
-
-filesToCopy.forEach((file) => {
-	fs.copyFileSync(file, path.join(thisPluginFolder, file));
-});
-
-// install hot-reload plugin to automatically reload this plugin
-const hotReloadFilePath = path.join(thisPluginFolder, ".hotreload");
-if (!fs.existsSync(hotReloadFilePath)) {
-	fs.writeFileSync(hotReloadFilePath, "");
-}
-const hotReloadFolder = path.join(pluginsFolder, "hot-reload");
-
-if (!fs.existsSync(hotReloadFolder)) {
-	fs.mkdirSync(hotReloadFolder, { recursive: true });
-	const hotReloadMain = "https://raw.githubusercontent.com/pjeby/hot-reload/master/main.js";
-	const hotReloadManifest = "https://raw.githubusercontent.com/pjeby/hot-reload/master/manifest.json";
-	https.get(hotReloadMain, function (response) {
-		response.pipe(fs.createWriteStream(path.join(hotReloadFolder, "main.js")));
-	});
-	https.get(hotReloadManifest, function (response) {
-		response.pipe(fs.createWriteStream(path.join(hotReloadFolder, "manifest.json")));
-	});
-}
-
-console.log(`${new Date().toLocaleTimeString()} Plugin installed successfully!`);
+for (const file of files) fs.copyFileSync(file, path.join(plugin, file));
+console.log("Installed Telegram Sync in the test vault.");
